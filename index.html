@@ -35,6 +35,7 @@
   --lcd-fg: #1f2a1c;
   --m0: #d4d7d9; --m1: #c4cee6; --m2: #96a8d6; --m3: #6380c4; --m4: #3b5aa6; --m5: #1d3577;
   --scrim: rgba(18, 22, 30, .6);
+  --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100; --c5: #e87ba4; --c0: #6b7180;
   --font-display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
   --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "Chivo Mono", ui-monospace, Menlo, Consolas, monospace;
@@ -49,6 +50,7 @@
     --lcd: #232b22; --lcd-fg: #b8cfa6;
     --m0: #262a31; --m1: #263354; --m2: #304a86; --m3: #4566b3; --m4: #6587d9; --m5: #9cb4f4;
     --scrim: rgba(0, 0, 0, .7);
+    --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181; --c0: #8a91a0;
     color-scheme: dark;
   }
 }
@@ -60,6 +62,7 @@
   --lcd: #232b22; --lcd-fg: #b8cfa6;
   --m0: #262a31; --m1: #263354; --m2: #304a86; --m3: #4566b3; --m4: #6587d9; --m5: #9cb4f4;
   --scrim: rgba(0, 0, 0, .7);
+    --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181; --c0: #8a91a0;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -119,11 +122,15 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
 .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 5px; }
 .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.16); min-width: 190px; max-width: 260px; z-index: 5; }
 .tip b { font: 800 20px/1.1 var(--font-display); text-transform: uppercase; display: block; }
+.tip-c { display: flex; align-items: center; gap: 8px; font-weight: 700; margin-top: 4px; }
+.tip-c .photo { width: 34px; height: 34px; flex: none; }
 .tip .row { display: flex; justify-content: space-between; gap: 10px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
 
 .state-head { display: flex; justify-content: space-between; align-items: start; gap: 10px; }
 .state-head h3 { font: 800 40px/.95 var(--font-display); margin: 4px 0 0; text-transform: uppercase; }
 /* abas como teclas da urna */
+.st-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font: 12px var(--font-mono); color: var(--muted); }
+.st-pick select { font-size: 14px; min-width: 220px; max-width: 100%; }
 .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0; }
 .tabs button { background: var(--surface); }
 .tabs button[aria-selected="true"] { background: var(--key); color: var(--key-fg); border-color: var(--key); box-shadow: 0 2px 0 rgba(0,0,0,.25); }
@@ -172,14 +179,18 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
 
 /* 27 estados */
 .states { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 6px; }
-.st-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; text-align: left; padding: 10px 12px; border-radius: 4px; border-color: transparent; background: var(--bg); font-weight: 400; line-height: 1.3; }
+.st-row { display: grid; grid-template-columns: 30px 40px minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; text-align: left; padding: 10px 12px; border-radius: 4px; border-color: transparent; background: var(--bg); font-weight: 400; line-height: 1.3; }
 .st-row:hover { border-color: var(--line); }
 .st-row[aria-current="true"] { border-color: var(--fg); background: var(--surface); }
-.st-row .uf { font: 800 22px/1 var(--font-display); grid-row: span 2; }
+.st-row .uf { font: 800 22px/1 var(--font-display); grid-row: span 3; }
+.st-row .ph { width: 40px; height: 40px; grid-row: span 3; }
+.photo.won { box-shadow: 0 0 0 2px var(--confirma); }
+.photo.t2 { box-shadow: 0 0 0 2px var(--corrige); }
+.st-row .ld { grid-column: 3 / -1; }
 .st-row .nm { font-size: 13px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .st-row .ld { font-size: 12px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .st-row .pp { font: 800 18px/1 var(--font-display); text-align: right; font-variant-numeric: tabular-nums; }
-.st-row .mini { grid-column: 2 / -1; height: 3px; background: var(--track); border-radius: 2px; overflow: hidden; }
+.st-row .mini { grid-column: 3 / -1; height: 3px; background: var(--track); border-radius: 2px; overflow: hidden; }
 .st-row .mini div { height: 100%; background: var(--ink); }
 .st-row .mini.done div { background: var(--confirma); }
 .st-row .mini.runoff div { background: var(--corrige); }
@@ -190,11 +201,16 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
 .cons-group h3 { font: 800 22px/1 var(--font-display); text-transform: uppercase; margin: 0; }
 .cons-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
 .won-card { border-radius: 4px; padding: 12px 14px; display: grid; gap: 3px; background: var(--bg); min-width: 0; border-left: 4px solid var(--confirma); }
+.won-card.has-ph { grid-template-columns: 52px minmax(0, 1fr); align-items: start; gap: 12px; }
+.won-card.has-ph .photo { width: 52px; height: 52px; grid-row: auto; }
+.wc-body { display: grid; gap: 3px; min-width: 0; }
 .won-card .k { font: 11px var(--font-mono); color: var(--muted); }
 .won-card strong { font: 800 22px/1.05 var(--font-display); text-transform: uppercase; overflow-wrap: anywhere; }
 .won-card span { font-size: 12px; color: var(--muted); }
 .won-card details summary { cursor: pointer; font: 12px var(--font-mono); color: var(--ink); }
 .won-card ol { margin: 6px 0 0; padding-left: 20px; font-size: 12px; max-height: 220px; overflow: auto; }
+.duo { display: flex; gap: 8px; margin-top: 4px; }
+.duo .photo { width: 40px; height: 40px; grid-row: auto; }
 .won-card.runoff { border-left-color: var(--corrige); }
 .won-card.new { animation: pop .7s cubic-bezier(.2, 1.4, .4, 1) both, glow 6s ease-out; }
 @keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -263,6 +279,7 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
         <h2 class="sec">Brasil</h2>
         <div class="seg" role="group" aria-label="Cor do mapa">
           <button type="button" id="layer-pst" aria-pressed="true">Urnas apuradas</button>
+          <button type="button" id="layer-pres" aria-pressed="false">Presidente</button>
           <button type="button" id="layer-gov" aria-pressed="false">Governador</button>
         </div>
       </div>
@@ -272,16 +289,17 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
     </div>
     <div class="panel" id="state-panel">
       <div class="state-head">
-        <div><div class="eyebrow">Estado selecionado</div><h3 id="st-name">—</h3></div>
+        <div><label class="eyebrow" for="st-select">Estado selecionado</label><h3 id="st-name">—</h3></div>
         <span class="pill" id="st-pill">—</span>
       </div>
+      <div class="st-pick"><label for="st-select">Ver outro estado</label><select id="st-select"></select></div>
       <div class="tabs" role="tablist" id="tabs"></div>
       <div class="detail" id="detail"></div>
     </div>
   </section>
 
   <section class="panel" style="display:grid;gap:14px">
-    <div class="sec-head"><h2 class="sec">Governadores por estado</h2><span class="eyebrow">Clique para abrir o estado</span></div>
+    <div class="sec-head"><h2 class="sec">Por estado</h2><div class="seg" role="group" aria-label="Cargo da lista"><button type="button" id="list-pres" aria-pressed="false">Presidente</button><button type="button" id="list-gov" aria-pressed="true">Governador</button></div></div>
     <div class="states" id="states"></div>
   </section>
 
@@ -320,8 +338,8 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
   };
   const cargoOf = (k, uf) => k === "depest" && uf === "df" ? "0008" : KINDS[k].cargo;
   const titleOf = (k, uf) => k === "depest" && uf === "df" ? "Dep. Distrital" : KINDS[k].title;
-  const fileUrl = (k, uf) => { const K = KINDS[k]; return `${BASE}/${K.el}/dados-simplificados/${uf}/${uf}-c${cargoOf(k, uf)}-e${K.el.padStart(6, "0")}-r.json`; };
-  const photoUrl = (k, uf, sq) => `${BASE}/${KINDS[k].el}/fotos/${uf}/${sq}.jpeg`;
+  const fileUrl = (k, uf) => { const K = KINDS[k]; return `${BASE}/${K.el}/dados/${uf}/${uf}-c${cargoOf(k, uf)}-e${K.el.padStart(6, "0")}-u.json`; };
+  const photoUrl = (k, uf, sq) => `${BASE}/${KINDS[k].el}/fotos/${k === "pres" ? "br" : uf}/${sq}.jpeg`;
 
   // ---------- utilidades ----------
   const num = v => v == null || v === "" ? 0 : typeof v === "number" ? v : parseFloat(String(v).replace(/\./g, "").replace(",", ".")) || 0;
@@ -331,10 +349,21 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const initials = nm => String(nm || "?").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("");
   const yes = v => v === "s" || v === "S" || v === true;
+  const face = (k, uf, c, cls = "") => `<span class="photo ${cls}"><span>${esc(initials(c.nm))}</span>${c.sq ? `<img alt="" loading="lazy" src="${esc(photoUrl(k, uf, c.sq))}" onerror="this.remove()">` : ""}</span>`;
   const $ = id => document.getElementById(id);
 
-  // O arquivo do TSE pode trazer os candidatos em "cand" ou dentro de agremiações/partidos
+  // Formato 2026 (arquivo "-u.json"): carg[].agr[].par[].cand[], com nome de urna em "nmu" e vice em "vs".
+  // Mantém compatível com o formato antigo, que trazia "cand" na raiz.
   function rawCands(d) {
+    if (Array.isArray(d.carg)) {
+      const out = [];
+      d.carg.forEach(cg => (cg.agr || []).forEach(a => (a.par || []).forEach(p => (p.cand || []).forEach(c => out.push({
+        ...c, nm: c.nmu || c.nm,
+        cc: p.sg,
+        nv: ((c.vs || []).find(v => v.tp === "v") || {}).nmu || "",
+      })))));
+      return out;
+    }
     if (Array.isArray(d.cand)) return d.cand;
     const out = [];
     (d.agr || []).forEach(a => (a.par || []).forEach(p => (p.cand || []).forEach(c => out.push({ ...c, cc: c.cc || p.sg || a.nm }))));
@@ -343,7 +372,10 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
 
   function normalize(k, d) {
     const K = KINDS[k];
-    const pst = num(d.pst);
+    // No formato 2026 seções, eleitorado e votos vêm em objetos separados (s, e, v)
+    const obj = x => x && typeof x === "object" ? x : null;
+    const Ss = obj(d.s) || d, Es = obj(d.e) || d, Vs = obj(d.v) || d;
+    const pst = num(Ss.pst);
     const done = yes(d.tf) || pst >= 100;
     const md = yes(d.md) || d.md === "e" || d.md === "E";
     const cands = rawCands(d).map(c => {
@@ -369,10 +401,10 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
     if (pst === 0 && !cands.some(c => c.v > 0)) sit = { cls: "wait", label: "Sem votos" };
     return {
       k, pst, done, md, sit, cands,
-      s: int(d.s), st: int(d.st),
-      c: int(d.c), pc: num(d.pc), a: int(d.a), pa: num(d.pa),
-      vb: int(d.vb), pvb: num(d.pvb), tvn: int(d.tvn ?? d.vn), ptvn: num(d.ptvn ?? d.pvn),
-      when: `${d.dg || ""} ${d.ht || d.hg || ""}`.trim(),
+      s: int(Ss.ts ?? Ss.s), st: int(Ss.st),
+      c: int(Es.c), pc: num(Es.pc), a: int(Es.a), pa: num(Es.pa),
+      vb: int(Vs.vb), pvb: num(Vs.pvb), tvn: int(Vs.tvn ?? Vs.vn), ptvn: num(Vs.ptvn ?? Vs.pvn),
+      when: d.dt ? `${d.dt} ${d.ht || ""}`.trim() : `${d.dg || ""} ${d.hg || ""}`.trim(),
     };
   }
 
@@ -389,11 +421,40 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
   }
 
   // ---------- estado da página ----------
-  const S = Object.fromEntries(UFS.map(u => [u.id, { gov: undefined, sen: undefined, depfed: undefined, depest: undefined, depFinal: { depfed: false, depest: false } }]));
+  const S = Object.fromEntries(UFS.map(u => [u.id, { pres: undefined, gov: undefined, sen: undefined, depfed: undefined, depest: undefined, depFinal: { depfed: false, depest: false } }]));
   let PRES;
   let selected = (location.hash.replace("#", "") in S) ? location.hash.replace("#", "") : "mg";
   let tab = "gov";
   let layer = "pst";
+  let listKind = "gov";
+  // Cor fixa por candidato a presidente (pelo número), atribuída na ordem em que aparecem
+  const presColor = new Map(); // número do candidato -> cor (1 a 4)
+  const colorOf = n => presColor.has(n) ? `var(--c${presColor.get(n)})` : "var(--c0)";
+  // Só quem lidera em algum estado ganha cor. A cor fica com o candidato enquanto ele liderar;
+  // quem deixa de liderar libera a cor para outro.
+  function seedColors() {
+    const leads = UFS.map(u => S[u.id].pres).filter(x => x && !(x instanceof Error) && x.cands[0]?.v).map(x => x.cands[0].n);
+    const nat = PRES && !(PRES instanceof Error) ? PRES.cands.map(c => c.n) : [];
+    const count = {}; leads.forEach(n => count[n] = (count[n] || 0) + 1);
+    // Prioridade para quem lidera em mais estados; empate decide pela ordem nacional
+    const leaders = Object.keys(count).sort((a, b) => count[b] - count[a] || (nat.indexOf(a) + 1 || 99) - (nat.indexOf(b) + 1 || 99));
+    for (const [n] of [...presColor]) if (!leaders.includes(n)) presColor.delete(n);
+    leaders.forEach(n => {
+      if (presColor.has(n)) return;
+      const used = new Set(presColor.values());
+      const free = [1, 2, 3, 4, 5].find(i => !used.has(i));
+      if (free) presColor.set(n, free);
+    });
+  }
+  // No estado, a situação do presidente segue o resultado nacional
+  function presState(n) {
+    if (!n) return n;
+    const nat = PRES && !(PRES instanceof Error) ? PRES : null;
+    const flags = nat ? Object.fromEntries(nat.cands.map(c => [c.n, c])) : {};
+    n.cands.forEach(c => { c.elected = !!flags[c.n]?.elected; c.runoff = !!flags[c.n]?.runoff; });
+    n.sit = n.pst === 0 && !n.cands.some(c => c.v > 0) ? { cls: "wait", label: "Sem votos" } : (n.done || n.md) ? { cls: "", label: "Apurado" } : { cls: "", label: "Em apuração" };
+    return n;
+  }
   let firstLoad = true;
   const confirmedKeys = new Set();
   const freshKeys = new Map(); // chave -> horário em que apareceu (para destacar)
@@ -479,6 +540,11 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
     const g = S[uf].gov;
     if (!g || g instanceof Error) return "var(--m0)";
     if (layer === "pst") return `var(--m${pstBin(g.pst)})`;
+    if (layer === "pres") {
+      const p = S[uf].pres;
+      if (!p || p instanceof Error || !p.cands.length || !p.cands[0].v) return "var(--m0)";
+      return colorOf(p.cands[0].n);
+    }
     return g.sit.cls === "done" ? "var(--confirma)" : g.sit.cls === "runoff" ? "var(--corrige)" : g.pst > 0 ? "var(--bar)" : "var(--m0)";
   }
   function renderMap() {
@@ -487,6 +553,18 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
       paths[u.id].classList.toggle("sel", u.id === selected);
     });
     paths[selected].parentNode.insertBefore(paths[selected], labels[MAP.locations[0].id]); // traz o selecionado para cima das bordas
+    if (layer === "pres") {
+      const leaders = new Set(UFS.map(u => S[u.id].pres).filter(p => p && !(p instanceof Error) && p.cands[0]?.v).map(p => p.cands[0].n));
+      const nat = PRES && !(PRES instanceof Error) ? PRES.cands : [];
+      const names = Object.fromEntries(nat.map(c => [c.n, c.nm]));
+      UFS.forEach(u => { const p = S[u.id].pres; if (p && !(p instanceof Error)) p.cands.forEach(c => names[c.n] = names[c.n] || c.nm); });
+      const items = [...leaders].sort((a, b) => (presColor.get(a) || 9) - (presColor.get(b) || 9)).map(n => { const col = colorOf(n);
+        const states = UFS.filter(u => { const p = S[u.id].pres; return p && !(p instanceof Error) && p.cands[0]?.v && p.cands[0].n === n; }).length;
+        return `<span><i style="background:${col}"></i>${esc(names[n] || n)} (${n}) · lidera em ${states}</span>`;
+      });
+      $("legend").innerHTML = (items.length ? items.join("") : "") + `<span><i style="background:var(--m0)"></i>sem dados</span>`;
+      return;
+    }
     $("legend").innerHTML = layer === "pst"
       ? [["m0", "sem dados"], ["m1", "até 25%"], ["m2", "25–50%"], ["m3", "50–75%"], ["m4", "75–99%"], ["m5", "100%"]].map(([c, t]) => `<span><i style="background:var(--${c})"></i>${t}</span>`).join("")
       : [["confirma", "governador eleito"], ["corrige", "2º turno"], ["bar", "em apuração"], ["m0", "sem dados"]].map(([c, t]) => `<span><i style="background:var(--${c})"></i>${t}</span>`).join("");
@@ -498,7 +576,8 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
     const lead = g && !(g instanceof Error) ? g.cands[0] : null;
     tip.innerHTML = `<b>${esc(UFNAME[uf])}</b>
       <div class="row"><span>Urnas apuradas</span><span>${g && !(g instanceof Error) ? fmtPct(g.pst) : "—"}</span></div>
-      ${lead ? `<div class="row"><span>Lidera governo</span><span>${fmtPct(lead.p)}</span></div><div style="font-weight:600;margin-top:2px">${esc(lead.nm)}</div>` : ""}
+      ${(() => { const p = S[uf].pres, pl = p && !(p instanceof Error) ? p.cands[0] : null; return pl && pl.v ? `<div class="row" style="margin-top:4px"><span>Lidera presidente</span><span>${fmtPct(pl.p)}</span></div><div class="tip-c">${face("pres", uf, pl)}<span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;background:${colorOf(pl.n)}"></i>${esc(pl.nm)}</span></div>` : ""; })()}
+      ${lead ? `<div class="row" style="margin-top:4px"><span>Lidera governo</span><span>${fmtPct(lead.p)}</span></div><div class="tip-c">${face("gov", uf, lead, lead.elected ? "won" : lead.runoff ? "t2" : "")}<span>${esc(lead.nm)}</span></div>` : ""}
       ${g && !(g instanceof Error) ? `<div style="margin-top:6px"><span class="pill ${g.sit.cls}">${g.sit.label}</span></div>` : ""}`;
     tip.hidden = false;
     const box = $("map-wrap").getBoundingClientRect();
@@ -512,26 +591,31 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
   svg.addEventListener("keydown", ev => { const uf = ev.target.dataset?.uf; if (uf && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); select(uf); } });
   $("layer-pst").addEventListener("click", () => setLayer("pst"));
   $("layer-gov").addEventListener("click", () => setLayer("gov"));
-  function setLayer(l) { layer = l; $("layer-pst").setAttribute("aria-pressed", l === "pst"); $("layer-gov").setAttribute("aria-pressed", l === "gov"); renderMap(); }
+  $("layer-pres").addEventListener("click", () => setLayer("pres"));
+  function setLayer(l) { layer = l; ["pst", "pres", "gov"].forEach(x => $("layer-" + x).setAttribute("aria-pressed", l === x)); renderMap(); }
+  function setList(k) { listKind = k; ["pres", "gov"].forEach(x => $("list-" + x).setAttribute("aria-pressed", k === x)); renderStates(); }
+  $("list-pres").addEventListener("click", () => setList("pres"));
+  $("list-gov").addEventListener("click", () => setList("gov"));
 
   // ---------- tabela dos estados ----------
   function renderStates() {
     $("states").innerHTML = UFS.map(u => {
-      const g = S[u.id].gov, ok = g && !(g instanceof Error), lead = ok ? g.cands[0] : null;
+      const g = S[u.id][listKind], ok = g && !(g instanceof Error), lead = ok && g.cands[0]?.v ? g.cands[0] : null;
+      const sw = listKind === "pres" && lead ? `<i style="display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;background:${colorOf(lead.n)}"></i>` : "";
       return `<button type="button" class="st-row" data-uf="${u.id}" aria-current="${u.id === selected}">
         <span class="uf">${u.id.toUpperCase()}</span>
-        <span class="nm">${esc(u.name)} ${ok && g.sit.cls ? `<span class="tag ${g.sit.cls === "done" ? "e" : "t2"}">${g.sit.label}</span>` : ""}</span>
+        ${lead ? face(listKind, u.id, lead, "ph" + (lead.elected ? " won" : lead.runoff ? " t2" : "")) : `<span class="photo ph"></span>`}
+        <span class="nm">${esc(u.name)} ${ok && g.sit.cls && listKind === "gov" ? `<span class="tag ${g.sit.cls === "done" ? "e" : "t2"}">${g.sit.label}</span>` : ""}</span>
         <span class="pp">${ok ? fmtPct(g.pst) : "—"}</span>
-        <span class="ld">${lead ? `${esc(lead.nm)} · ${fmtPct(lead.p)}` : "aguardando"}</span>
-        <span></span>
-        <span class="mini ${ok ? g.sit.cls : ""}"><div style="width:${ok ? Math.min(100, g.pst) : 0}%"></div></span>
+        <span class="ld">${lead ? `${sw}${esc(lead.nm)} · ${fmtPct(lead.p)}${lead.elected ? " · eleito" : ""}` : "aguardando"}</span>
+        <span class="mini ${ok && listKind === "gov" ? g.sit.cls : ""}"><div style="width:${ok ? Math.min(100, g.pst) : 0}%"></div></span>
       </button>`;
     }).join("");
   }
   $("states").addEventListener("click", ev => { const b = ev.target.closest("[data-uf]"); if (b) { select(b.dataset.uf); $("state-panel").scrollIntoView({ behavior: "smooth", block: "start" }); } });
 
   // ---------- painel do estado ----------
-  const TABS = ["gov", "sen", "depfed", "depest"];
+  const TABS = ["pres", "gov", "sen", "depfed", "depest"];
   function renderTabs() {
     $("tabs").innerHTML = TABS.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${t === tab}">${titleOf(t, selected)}</button>`).join("");
   }
@@ -566,7 +650,7 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="eyebrow">${titleOf(tab, selected)}${tab === "sen" ? " · 2 vagas" : ""}</span><span class="pill ${n.sit.cls}">${n.sit.label}</span></div>
         ${progress(n)}${candList(tab, selected, n, 8)}
         ${n.cands.length > 8 ? `<div class="more">+ ${n.cands.length - 8} candidatos com menos votos</div>` : ""}
-        ${stats(n)}<div class="more">Totalizado pelo TSE em ${esc(n.when)}</div></div>`;
+        ${stats(n)}<div class="more">Dados do TSE de ${esc(n.when)}</div></div>`;
       return;
     }
     // Proporcional (deputados)
@@ -588,16 +672,20 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
     $("pd-list").innerHTML = list.length ? candList(tab, selected, { ...n, cands: list }, LIMIT) + (list.length > LIMIT ? `<div class="more" style="margin-top:8px">Mostrando ${LIMIT} de ${fmtInt(list.length)}. Use a busca para achar outros.</div>` : "") : `<div class="empty">Nenhum candidato encontrado.</div>`;
   }
 
+  const stSelect = $("st-select");
+  stSelect.innerHTML = UFS.map(u => `<option value="${u.id}">${esc(u.name)} (${u.id.toUpperCase()})</option>`).join("");
+  stSelect.addEventListener("change", () => select(stSelect.value));
   function select(uf) {
     if (!(uf in S)) return;
     selected = uf;
+    stSelect.value = uf;
     try { history.replaceState(null, "", "#" + uf); } catch {}
     renderTabs(); buildDetail(); renderMap(); renderStates();
     loadSelected();
   }
   async function loadSelected() {
     const uf = selected, k = tab;
-    if (k === "gov") { renderDetail(); return; }
+    if (k === "gov" || k === "pres") { renderDetail(); return; }
     try { S[uf][k] = await fetchRace(k, uf); } catch (e) { S[uf][k] = e; }
     if (uf === selected && k === tab) renderDetail();
   }
@@ -636,11 +724,11 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
 
     const now = Date.now();
     const cls = x => freshKeys.has(x.key) && now - freshKeys.get(x.key) < 8000 ? " new" : "";
-    const candCard = x => `<div class="won-card${cls(x)}">
+    const candCard = x => `<div class="won-card has-ph${cls(x)}">${face(x.kind, x.uf, x.c, "won")}<div class="wc-body">
         <span class="k">${x.kind === "pres" ? "Presidente eleito" : "Governador · " + x.uf.toUpperCase()}</span>
         <strong>${esc(x.c.nm)}</strong>
         <span>${esc(x.c.n)} · ${esc(x.c.cc || "")}</span>
-        <span>${fmtPct(x.c.p)} dos válidos · ${fmtInt(x.c.v)} votos</span></div>`;
+        <span>${fmtPct(x.c.p)} dos válidos · ${fmtInt(x.c.v)} votos</span></div></div>`;
     const benchCard = x => `<div class="won-card${cls(x)}">
         <span class="k">${esc(UFNAME[x.uf])}</span>
         <strong>${x.list.length} eleitos</strong>
@@ -651,7 +739,7 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
     $("cons-body").innerHTML = [
       group("Presidente", pres.map(candCard), presRunoff ? `Haverá 2º turno entre ${esc(PRES.cands.filter(c => c.runoff).map(c => c.nm).join(" e "))}.` : "Ainda sem confirmação do TSE."),
       group("Governadores eleitos no 1º turno", sortUf(govs).map(candCard), "Nenhum governador confirmado ainda."),
-      runoffs.length ? group("Governo vai ao 2º turno", runoffs.map(u => `<div class="won-card runoff"><span class="k">${u.id.toUpperCase()} · 2º turno</span><strong>${esc(UFNAME[u.id])}</strong><span>${esc(S[u.id].gov.cands.filter(c => c.runoff).map(c => c.nm).join(" × "))}</span></div>`), "") : "",
+      runoffs.length ? group("Governo vai ao 2º turno", runoffs.map(u => `<div class="won-card runoff"><span class="k">${u.id.toUpperCase()} · 2º turno</span><strong>${esc(UFNAME[u.id])}</strong><span>${esc(S[u.id].gov.cands.filter(c => c.runoff).map(c => c.nm).join(" × "))}</span><span class="duo">${S[u.id].gov.cands.filter(c => c.runoff).map(c => face("gov", u.id, c, "t2")).join("")}</span></div>`), "") : "",
       group("Deputados federais", sortUf(fed).map(benchCard), "Nenhuma bancada federal fechada ainda. Elas aparecem quando o TSE termina a totalização de cada estado."),
       group("Deputados estaduais e distritais", sortUf(est).map(benchCard), "Nenhuma assembleia fechada ainda."),
     ].join("");
@@ -726,6 +814,7 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
     let errors = 0, got = 0;
     const tasks = [
       fetchRace("pres", "br").then(n => { PRES = n; if (n) got++; }).catch(e => { PRES = e; errors++; }),
+      ...UFS.map(u => fetchRace("pres", u.id).then(n => { S[u.id].pres = n; if (n) got++; }).catch(e => { S[u.id].pres = e; errors++; })),
       ...UFS.map(u => fetchRace("gov", u.id).then(n => { S[u.id].gov = n; if (n) got++; }).catch(e => { S[u.id].gov = e; errors++; })),
     ];
     await Promise.all(tasks);
@@ -744,11 +833,13 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
       });
     });
     // Aba aberta no painel (senador ou deputados de um estado ainda em apuração)
-    if (tab !== "gov" && !(KINDS[tab].prop && S[selected].depFinal[tab])) {
+    if (tab !== "gov" && tab !== "pres" && !(KINDS[tab].prop && S[selected].depFinal[tab])) {
       depTasks.push(fetchRace(tab, selected).then(n => { S[selected][tab] = n; }).catch(e => { S[selected][tab] = e; }));
     }
     await Promise.all(depTasks);
 
+    UFS.forEach(u => { const p = S[u.id].pres; if (p && !(p instanceof Error)) presState(p); });
+    seedColors();
     renderPres(); renderKpis(); renderMap(); renderStates(); renderDetail();
 
     const conf = collectConfirmed();
@@ -802,7 +893,7 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
         else if (K.runoff) st = order[0][0] > 50 ? (rank === 0 ? "Eleito" : "Não eleito") : (rank < 2 ? "2º turno" : "Não eleito");
         else st = rank < K.seats ? "Eleito" : "Não eleito";
       }
-      return { sqcand: "", n: String((k === "depest" ? 10000 : k === "depfed" ? 1000 : 10) + i * 11), nm: `${K.prop ? "Candidato" : "Candidata"} ${String.fromCharCode(65 + (i % 26))}${i >= 26 ? i : ""} ${uf.toUpperCase()}`, cc: ["PARTIDO A", "PARTIDO B", "PARTIDO C", "PARTIDO D"][i % 4], nv: "", st, e: done && /^Eleit/.test(st) ? "s" : "n", vap: String(Math.round(valid * p / 100)), pvap: p.toFixed(2).replace(".", ",") };
+      return { sqcand: "", n: String((k === "depest" ? 10000 : k === "depfed" ? 1000 : 10) + i * 11), nm: `${K.prop ? "Candidato" : "Candidata"} ${String.fromCharCode(65 + (i % 26))}${i >= 26 ? i : ""} ${k === "pres" ? "BR" : uf.toUpperCase()}`, cc: ["PARTIDO A", "PARTIDO B", "PARTIDO C", "PARTIDO D"][i % 4], nv: "", st, e: done && /^Eleit/.test(st) ? "s" : "n", vap: String(Math.round(valid * p / 100)), pvap: p.toFixed(2).replace(".", ",") };
     });
     return { s: "20000", st: String(Math.round(200 * pst)), pst: pst.toFixed(2).replace(".", ","), tf: done ? "s" : "n", md: "n",
       c: "9800000", pc: "78,12", a: "2740000", pa: "21,88", vb: "150000", pvb: "1,62", tvn: "310000", ptvn: "3,35",
@@ -810,6 +901,7 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
   }
   if (DEMO) { $("demo-banner").hidden = false; $("interval").disabled = true; }
 
+  stSelect.value = selected;
   renderPres(); renderKpis(); renderMap(); renderStates(); renderTabs(); buildDetail();
   cycle();
   schedule();
