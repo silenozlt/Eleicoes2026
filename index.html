@@ -944,24 +944,29 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     let errors = 0, got = 0, doneCount = 0;
     // Em caso de erro, mantém o último resultado bom em vez de apagar o estado da tela
     const keep = (old, e) => old && !(old instanceof Error) ? old : e;
-    // Ordem de prioridade: Brasil, estado aberto no painel, depois o resto
-    const ordered = [selected, ...UFS.map(u => u.id).filter(id => id !== selected)];
+    const job = (k, id) => () => fetchRace(k, id)
+      .then(n => { S[id][k] = n; if (n && k !== "sen") got++; })
+      .catch(e => { S[id][k] = keep(S[id][k], e); if (k !== "sen") errors++; });
+    // Cargo de estado com totalização final do TSE não muda mais: deixa de ser consultado
+    const want = (k, id) => !S[id][k]?.final;
+    const others = UFS.map(u => u.id).filter(id => id !== selected);
+    // Ordem: Brasil; estado aberto no painel; presidente nos estados (o mapa); depois governador e senador
     const jobs = [
       () => fetchRace("pres", "br").then(n => { PRES = n; if (n) got++; }).catch(e => { PRES = keep(PRES, e); errors++; }),
-      // Cargo de estado com totalização final do TSE não muda mais: deixa de ser consultado
-      ...ordered.filter(id => !S[id].pres?.final).map(id => () => fetchRace("pres", id).then(n => { S[id].pres = n; if (n) got++; }).catch(e => { S[id].pres = keep(S[id].pres, e); errors++; })),
-      ...ordered.filter(id => !S[id].gov?.final).map(id => () => fetchRace("gov", id).then(n => { S[id].gov = n; if (n) got++; }).catch(e => { S[id].gov = keep(S[id].gov, e); errors++; })),
-      ...ordered.filter(id => !S[id].sen?.final).map(id => () => fetchRace("sen", id).then(n => { S[id].sen = n; }).catch(e => { S[id].sen = keep(S[id].sen, e); })),
+      ...["pres", "gov", "sen"].filter(k => want(k, selected)).map(k => job(k, selected)),
+      ...others.filter(id => want("pres", id)).map(id => job("pres", id)),
+      ...others.filter(id => want("gov", id)).map(id => job("gov", id)),
+      ...others.filter(id => want("sen", id)).map(id => job("sen", id)),
     ];
     const total = jobs.length;
-    statusText.textContent = `Atualizando… 0/${total}`;
+    statusText.textContent = `${statusPrefix}Atualizando… 0/${total}`;
     // Até 12 consultas ao mesmo tempo; a tela é redesenhada aos poucos, conforme os dados chegam
     let next = 0;
     const worker = async () => {
       while (next < jobs.length) {
         await jobs[next++]();
         doneCount++;
-        statusText.textContent = `Atualizando… ${doneCount}/${total}`;
+        statusText.textContent = `${statusPrefix}Atualizando… ${doneCount}/${total}`;
         scheduleRender();
       }
     };
@@ -1000,6 +1005,8 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       fresh.sort((a, b) => order[a.kind] - order[b.kind]).forEach(celebrate);
     }
     firstLoad = false;
+    statusPrefix = "";
+    saveSnap();
 
     if (tseLimited) skipNext = true;
     const now = new Date().toLocaleTimeString("pt-BR");
@@ -1050,8 +1057,38 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   }
   if (DEMO) { $("demo-banner").hidden = false; $("interval").disabled = true; }
 
+  // ---------- últimos dados guardados no aparelho ----------
+  // Ao abrir de novo, mostra na hora o último resultado visto (até 6 h atrás) e atualiza por trás.
+  const SNAP_KEY = "apuracao2026:v1";
+  let statusPrefix = "";
+  function saveSnap() {
+    if (DEMO) return;
+    try {
+      const ok = x => x && !(x instanceof Error) ? x : undefined;
+      localStorage.setItem(SNAP_KEY, JSON.stringify({ t: Date.now(), PRES: ok(PRES),
+        S: Object.fromEntries(UFS.map(u => [u.id, { pres: ok(S[u.id].pres), gov: ok(S[u.id].gov), sen: ok(S[u.id].sen) }])) }));
+    } catch {}
+  }
+  function loadSnap() {
+    if (DEMO) return null;
+    try {
+      const d = JSON.parse(localStorage.getItem(SNAP_KEY) || "null");
+      if (!d || !d.t || Date.now() - d.t > 6 * 3600e3) return null;
+      if (d.PRES) PRES = d.PRES;
+      UFS.forEach(u => { const s = d.S && d.S[u.id]; if (s) ["pres", "gov", "sen"].forEach(k => { if (s[k]) S[u.id][k] = s[k]; }); });
+      return d.t;
+    } catch { return null; }
+  }
+  const snapT = loadSnap();
+  if (snapT) {
+    UFS.forEach(u => { const p = S[u.id].pres; if (p) presState(p); });
+    statusPrefix = `Dados das ${new Date(snapT).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · `;
+    collectConfirmed().forEach(x => confirmedKeys.add(x.key));
+  }
+
   stSelect.value = selected;
   renderPres(); renderKpis(); renderMap(); renderStates(); renderTabs(); buildDetail();
+  if (snapT) renderConsolidated(collectConfirmed());
   cycle();
   schedule();
 })();
