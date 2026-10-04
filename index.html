@@ -110,7 +110,7 @@ button:hover { border-color: var(--fg); }
 .geo { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .map-wrap { position: relative; }
 .map-tools { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
-.seg { display: inline-flex; background: var(--track); border-radius: 4px; padding: 3px; gap: 3px; }
+.seg { display: inline-flex; flex-wrap: wrap; max-width: 100%; background: var(--track); border-radius: 4px; padding: 3px; gap: 3px; }
 .seg button { border: 0; padding: 7px 10px; background: transparent; color: var(--muted); }
 .seg button[aria-pressed="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
 svg.map { width: 100%; height: auto; display: block; max-height: 640px; }
@@ -287,6 +287,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
           <button type="button" id="layer-pst" aria-pressed="true">Urnas apuradas</button>
           <button type="button" id="layer-pres" aria-pressed="false">Presidente</button>
           <button type="button" id="layer-gov" aria-pressed="false">Governador</button>
+          <button type="button" id="layer-sen" aria-pressed="false">Senador</button>
         </div>
       </div>
       <svg class="map" id="map" role="img" aria-label="Mapa do Brasil por estado"></svg>
@@ -305,7 +306,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   </section>
 
   <section class="panel" style="display:grid;gap:14px">
-    <div class="sec-head"><h2 class="sec">Por estado</h2><div class="seg" role="group" aria-label="Cargo da lista"><button type="button" id="list-pres" aria-pressed="false">Presidente</button><button type="button" id="list-gov" aria-pressed="true">Governador</button></div></div>
+    <div class="sec-head"><h2 class="sec">Por estado</h2><div class="seg" role="group" aria-label="Cargo da lista"><button type="button" id="list-pres" aria-pressed="false">Presidente</button><button type="button" id="list-gov" aria-pressed="true">Governador</button><button type="button" id="list-sen" aria-pressed="false">Senador</button></div></div>
     <div class="states" id="states"></div>
   </section>
 
@@ -434,24 +435,19 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   let layer = "pst";
   let listKind = "gov";
   // Cor fixa por candidato a presidente (pelo número), atribuída na ordem em que aparecem
-  const presColor = new Map(); // número do candidato -> cor (1 a 4)
-  const colorOf = n => presColor.has(n) ? `var(--c${presColor.get(n)})` : "var(--c0)";
-  // Só quem lidera em algum estado ganha cor. A cor fica com o candidato enquanto ele liderar;
-  // quem deixa de liderar libera a cor para outro.
-  function seedColors() {
-    const leads = UFS.map(u => S[u.id].pres).filter(x => x && !(x instanceof Error) && x.cands[0]?.v).map(x => x.cands[0].n);
-    const nat = PRES && !(PRES instanceof Error) ? PRES.cands.map(c => c.n) : [];
-    const count = {}; leads.forEach(n => count[n] = (count[n] || 0) + 1);
-    // Prioridade para quem lidera em mais estados; empate decide pela ordem nacional
-    const leaders = Object.keys(count).sort((a, b) => count[b] - count[a] || (nat.indexOf(a) + 1 || 99) - (nat.indexOf(b) + 1 || 99));
-    for (const [n] of [...presColor]) if (!leaders.includes(n)) presColor.delete(n);
-    leaders.forEach(n => {
-      if (presColor.has(n)) return;
-      const used = new Set(presColor.values());
-      const free = [1, 2, 3, 4, 5].find(i => !used.has(i));
-      if (free) presColor.set(n, free);
-    });
-  }
+  // Cores de partido (as tradicionais de cada legenda). Partido sem cor definida fica cinza.
+  const PARTY = {
+    PT: "#c8102e", PCDOB: "#9b0d1e", PSOL: "#f5b700", PSB: "#f08a00", PDT: "#8e1b3a", PV: "#3f9b3f", REDE: "#00a19a",
+    PL: "#1b3f8b", PSD: "#3d9bd9", NOVO: "#f26722", MDB: "#2e7d32", UNIAO: "#5a4fb0", PSDB: "#7fb2e5",
+    REPUBLICANOS: "#0f766e", PP: "#6d8fc9", PODE: "#8bc34a", SOLIDARIEDADE: "#ff9e1b", AVANTE: "#e0457b",
+    CIDADANIA: "#d81b60", MISSAO: "#37474f", PRD: "#4e6a8a", DC: "#2b6cb0", AGIR: "#00838f", MOBILIZA: "#7b8f2a",
+    PRTB: "#1e8f5a", PMB: "#b05fa8", PCO: "#a61c00", PSTU: "#d32f2f", PCB: "#b71c1c", UP: "#e53935",
+  };
+  const partyKey = cc => String(cc || "").split(" - ")[0].normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z]/g, "").toUpperCase();
+  const partyName = cc => String(cc || "").split(" - ")[0].trim() || "?";
+  const partyColor = cc => PARTY[partyKey(cc)] || "var(--c0)";
+  const swatch = (c, size = 10) => `<i style="display:inline-block;width:${size}px;height:${size}px;border-radius:2px;margin-right:5px;background:${partyColor(c.cc)}"></i>`;
+  const leaderOf = (k, uf) => { const d = S[uf][k]; return d && !(d instanceof Error) && d.cands[0]?.v ? d.cands[0] : null; };
   // No estado, a situação do presidente segue o resultado nacional
   function presState(n) {
     if (!n) return n;
@@ -539,13 +535,13 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   const COL_X = vw + 14;
   svg.setAttribute("viewBox", `${vx} ${vy} ${vw + 78} ${vh}`);
   const labelLayer = mk("g", {}, svg);
-  const pctEls = {};
+  const pctEls = {}, ufEls = {};
   const center = id => { const b = paths[id].getBBox(); const [dx, dy] = NUDGE[id] || [0, 0]; return [b.x + b.width / 2 + dx, b.y + b.height / 2 + dy]; };
   MAP.locations.filter(l => !CALLOUT.includes(l.id)).forEach(l => {
     const [x, y] = center(l.id);
     const small = SMALL.has(l.id);
     const t = mk("text", { x, y: y - (small ? 4 : 6), class: small ? "small" : "" }, labelLayer);
-    t.textContent = l.id.toUpperCase();
+    ufEls[l.id] = mk("tspan", {}, t);
     const p = mk("text", { x, y: y + (small ? 4 : 6), class: "pc" + (small ? " small" : "") }, labelLayer);
     labels[l.id] = t; pctEls[l.id] = p;
   });
@@ -555,7 +551,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     mk("polyline", { points: `${x},${y} ${COL_X - 12},${ly} ${COL_X - 4},${ly}`, class: "lead" }, labelLayer);
     mk("circle", { cx: x, cy: y, r: 1.6, class: "lead-dot" }, labelLayer);
     const t = mk("text", { x: COL_X, y: ly, class: "co" }, labelLayer);
-    t.textContent = id.toUpperCase();
+    ufEls[id] = mk("tspan", {}, t);
     const p = mk("tspan", { dx: 4, class: "pc" }, t);
     labels[id] = t; pctEls[id] = p;
   });
@@ -563,15 +559,12 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
 
   const pstBin = p => p <= 0 ? 0 : p < 25 ? 1 : p < 50 ? 2 : p < 75 ? 3 : p < 100 ? 4 : 5;
   function fillFor(uf) {
-    const g = S[uf].gov;
-    if (!g || g instanceof Error) return "var(--m0)";
-    if (layer === "pst") return `var(--m${pstBin(g.pst)})`;
-    if (layer === "pres") {
-      const p = S[uf].pres;
-      if (!p || p instanceof Error || !p.cands.length || !p.cands[0].v) return "var(--m0)";
-      return colorOf(p.cands[0].n);
+    if (layer === "pst") {
+      const d = [S[uf].pres, S[uf].gov].find(x => x && !(x instanceof Error));
+      return d ? `var(--m${pstBin(d.pst)})` : "var(--m0)";
     }
-    return g.sit.cls === "done" ? "var(--confirma)" : g.sit.cls === "runoff" ? "var(--corrige)" : g.pst > 0 ? "var(--bar)" : "var(--m0)";
+    const lead = leaderOf(layer, uf);
+    return lead ? partyColor(lead.cc) : "var(--m0)";
   }
   function renderMap() {
     UFS.forEach(u => {
@@ -582,22 +575,22 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     UFS.forEach(u => {
       const d = [S[u.id].pres, S[u.id].gov].find(x => x && !(x instanceof Error));
       pctEls[u.id].textContent = d ? pctText(d.pst) : "–";
+      // ✓ = eleito no estado; 2T = governo vai ao 2º turno
+      const r = layer === "gov" || layer === "sen" ? S[u.id][layer] : null;
+      const ok = r && !(r instanceof Error);
+      ufEls[u.id].textContent = u.id.toUpperCase() + (ok && r.sit.cls === "done" ? " ✓" : ok && r.sit.cls === "runoff" ? " 2T" : "");
     });
-    if (layer === "pres") {
-      const leaders = new Set(UFS.map(u => S[u.id].pres).filter(p => p && !(p instanceof Error) && p.cands[0]?.v).map(p => p.cands[0].n));
-      const nat = PRES && !(PRES instanceof Error) ? PRES.cands : [];
-      const names = Object.fromEntries(nat.map(c => [c.n, c.nm]));
-      UFS.forEach(u => { const p = S[u.id].pres; if (p && !(p instanceof Error)) p.cands.forEach(c => names[c.n] = names[c.n] || c.nm); });
-      const items = [...leaders].sort((a, b) => (presColor.get(a) || 9) - (presColor.get(b) || 9)).map(n => { const col = colorOf(n);
-        const states = UFS.filter(u => { const p = S[u.id].pres; return p && !(p instanceof Error) && p.cands[0]?.v && p.cands[0].n === n; }).length;
-        return `<span><i style="background:${col}"></i>${esc(names[n] || n)} (${n}) · lidera em ${states}</span>`;
-      });
-      $("legend").innerHTML = (items.length ? items.join("") : "") + `<span><i style="background:var(--m0)"></i>sem dados</span>`;
+    if (layer === "pst") {
+      $("legend").innerHTML = [["m0", "sem dados"], ["m1", "até 25%"], ["m2", "25–50%"], ["m3", "50–75%"], ["m4", "75–99%"], ["m5", "100%"]].map(([c, t]) => `<span><i style="background:var(--${c})"></i>${t}</span>`).join("");
       return;
     }
-    $("legend").innerHTML = layer === "pst"
-      ? [["m0", "sem dados"], ["m1", "até 25%"], ["m2", "25–50%"], ["m3", "50–75%"], ["m4", "75–99%"], ["m5", "100%"]].map(([c, t]) => `<span><i style="background:var(--${c})"></i>${t}</span>`).join("")
-      : [["confirma", "governador eleito"], ["corrige", "2º turno"], ["bar", "em apuração"], ["m0", "sem dados"]].map(([c, t]) => `<span><i style="background:var(--${c})"></i>${t}</span>`).join("");
+    // Legenda: partidos que lideram em algum estado, com quantos estados
+    const count = {}, sample = {};
+    UFS.forEach(u => { const l = leaderOf(layer, u.id); if (l) { const p = partyName(l.cc); count[p] = (count[p] || 0) + 1; sample[p] = l; } });
+    const items = Object.keys(count).sort((a, b) => count[b] - count[a]).map(p =>
+      `<span>${swatch(sample[p], 12)}${esc(p)}${layer === "pres" ? " (" + esc(sample[p].nm) + ")" : ""} · ${count[p]}</span>`);
+    const note = layer === "pres" ? "" : `<span>✓ eleito${layer === "gov" ? " · 2T 2º turno" : ""}</span>`;
+    $("legend").innerHTML = items.join("") + `<span><i style="background:var(--m0)"></i>sem dados</span>` + note;
   }
 
   const tip = $("tip");
@@ -606,8 +599,9 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     const lead = g && !(g instanceof Error) ? g.cands[0] : null;
     tip.innerHTML = `<b>${esc(UFNAME[uf])}</b>
       <div class="row"><span>Urnas apuradas</span><span>${g && !(g instanceof Error) ? fmtPct(g.pst) : "—"}</span></div>
-      ${(() => { const p = S[uf].pres, pl = p && !(p instanceof Error) ? p.cands[0] : null; return pl && pl.v ? `<div class="row" style="margin-top:4px"><span>Lidera presidente</span><span>${fmtPct(pl.p)}</span></div><div class="tip-c">${face("pres", uf, pl)}<span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;background:${colorOf(pl.n)}"></i>${esc(pl.nm)}</span></div>` : ""; })()}
-      ${lead ? `<div class="row" style="margin-top:4px"><span>Lidera governo</span><span>${fmtPct(lead.p)}</span></div><div class="tip-c">${face("gov", uf, lead, lead.elected ? "won" : lead.runoff ? "t2" : "")}<span>${esc(lead.nm)}</span></div>` : ""}
+      ${(() => { const p = S[uf].pres, pl = p && !(p instanceof Error) ? p.cands[0] : null; return pl && pl.v ? `<div class="row" style="margin-top:4px"><span>Lidera presidente</span><span>${fmtPct(pl.p)}</span></div><div class="tip-c">${face("pres", uf, pl)}<span>${swatch(pl)}${esc(pl.nm)} <small style="font-weight:400">${esc(partyName(pl.cc))}</small></span></div>` : ""; })()}
+      ${lead ? `<div class="row" style="margin-top:4px"><span>Lidera governo</span><span>${fmtPct(lead.p)}</span></div><div class="tip-c">${face("gov", uf, lead, lead.elected ? "won" : lead.runoff ? "t2" : "")}<span>${swatch(lead)}${esc(lead.nm)} <small style="font-weight:400">${esc(partyName(lead.cc))}</small></span></div>` : ""}
+      ${(() => { const sn = S[uf].sen, top = sn && !(sn instanceof Error) && sn.cands[0]?.v ? sn.cands.slice(0, 2) : []; return top.length ? `<div class="row" style="margin-top:4px"><span>Senado (2 vagas)</span><span></span></div>` + top.map(c => `<div class="tip-c">${face("sen", uf, c, c.elected ? "won" : "")}<span>${swatch(c)}${esc(c.nm)} <small style="font-weight:400">${esc(partyName(c.cc))} · ${fmtPct(c.p)}</small></span></div>`).join("") : ""; })()}
       ${g && !(g instanceof Error) ? `<div style="margin-top:6px"><span class="pill ${g.sit.cls}">${g.sit.label}</span></div>` : ""}`;
     tip.hidden = false;
     const box = $("map-wrap").getBoundingClientRect();
@@ -622,8 +616,10 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   $("layer-pst").addEventListener("click", () => setLayer("pst"));
   $("layer-gov").addEventListener("click", () => setLayer("gov"));
   $("layer-pres").addEventListener("click", () => setLayer("pres"));
-  function setLayer(l) { layer = l; ["pst", "pres", "gov"].forEach(x => $("layer-" + x).setAttribute("aria-pressed", l === x)); renderMap(); }
-  function setList(k) { listKind = k; ["pres", "gov"].forEach(x => $("list-" + x).setAttribute("aria-pressed", k === x)); renderStates(); }
+  $("layer-sen").addEventListener("click", () => setLayer("sen"));
+  function setLayer(l) { layer = l; ["pst", "pres", "gov", "sen"].forEach(x => $("layer-" + x).setAttribute("aria-pressed", l === x)); renderMap(); }
+  function setList(k) { listKind = k; ["pres", "gov", "sen"].forEach(x => $("list-" + x).setAttribute("aria-pressed", k === x)); renderStates(); }
+  $("list-sen").addEventListener("click", () => setList("sen"));
   $("list-pres").addEventListener("click", () => setList("pres"));
   $("list-gov").addEventListener("click", () => setList("gov"));
 
@@ -631,14 +627,14 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   function renderStates() {
     $("states").innerHTML = UFS.map(u => {
       const g = S[u.id][listKind], ok = g && !(g instanceof Error), lead = ok && g.cands[0]?.v ? g.cands[0] : null;
-      const sw = listKind === "pres" && lead ? `<i style="display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;background:${colorOf(lead.n)}"></i>` : "";
+      const sw = lead ? swatch(lead, 9) : "";
       return `<button type="button" class="st-row" data-uf="${u.id}" aria-current="${u.id === selected}">
         <span class="uf">${u.id.toUpperCase()}</span>
         ${lead ? face(listKind, u.id, lead, "ph" + (lead.elected ? " won" : lead.runoff ? " t2" : "")) : `<span class="photo ph"></span>`}
-        <span class="nm">${esc(u.name)} ${ok && g.sit.cls && listKind === "gov" ? `<span class="tag ${g.sit.cls === "done" ? "e" : "t2"}">${g.sit.label}</span>` : ""}</span>
+        <span class="nm">${esc(u.name)} ${ok && g.sit.cls && listKind !== "pres" ? `<span class="tag ${g.sit.cls === "done" ? "e" : "t2"}">${g.sit.label}</span>` : ""}</span>
         <span class="pp">${ok ? fmtPct(g.pst) : "—"}</span>
-        <span class="ld">${lead ? `${sw}${esc(lead.nm)} · ${fmtPct(lead.p)}${lead.elected ? " · eleito" : ""}` : "aguardando"}</span>
-        <span class="mini ${ok && listKind === "gov" ? g.sit.cls : ""}"><div style="width:${ok ? Math.min(100, g.pst) : 0}%"></div></span>
+        <span class="ld">${lead ? `${sw}${esc(lead.nm)} (${esc(partyName(lead.cc))}) · ${fmtPct(lead.p)}${lead.elected ? " · eleito" : ""}` : "aguardando"}</span>
+        <span class="mini ${ok && listKind !== "pres" ? g.sit.cls : ""}"><div style="width:${ok ? Math.min(100, g.pst) : 0}%"></div></span>
       </button>`;
     }).join("");
   }
@@ -715,7 +711,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   }
   async function loadSelected() {
     const uf = selected, k = tab;
-    if (k === "gov" || k === "pres") { renderDetail(); return; }
+    if (k === "gov" || k === "pres" || (k === "sen" && S[uf].sen !== undefined)) { renderDetail(); return; }
     try { S[uf][k] = await fetchRace(k, uf); } catch (e) { S[uf][k] = e; }
     if (uf === selected && k === tab) renderDetail();
   }
@@ -845,6 +841,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     const tasks = [
       fetchRace("pres", "br").then(n => { PRES = n; if (n) got++; }).catch(e => { PRES = e; errors++; }),
       ...UFS.map(u => fetchRace("pres", u.id).then(n => { S[u.id].pres = n; if (n) got++; }).catch(e => { S[u.id].pres = e; errors++; })),
+      ...UFS.map(u => fetchRace("sen", u.id).then(n => { S[u.id].sen = n; }).catch(e => { S[u.id].sen = e; })),
       ...UFS.map(u => fetchRace("gov", u.id).then(n => { S[u.id].gov = n; if (n) got++; }).catch(e => { S[u.id].gov = e; errors++; })),
     ];
     await Promise.all(tasks);
@@ -863,13 +860,12 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       });
     });
     // Aba aberta no painel (senador ou deputados de um estado ainda em apuração)
-    if (tab !== "gov" && tab !== "pres" && !(KINDS[tab].prop && S[selected].depFinal[tab])) {
+    if (tab !== "gov" && tab !== "pres" && tab !== "sen" && !(KINDS[tab].prop && S[selected].depFinal[tab])) {
       depTasks.push(fetchRace(tab, selected).then(n => { S[selected][tab] = n; }).catch(e => { S[selected][tab] = e; }));
     }
     await Promise.all(depTasks);
 
     UFS.forEach(u => { const p = S[u.id].pres; if (p && !(p instanceof Error)) presState(p); });
-    seedColors();
     renderPres(); renderKpis(); renderMap(); renderStates(); renderDetail();
 
     const conf = collectConfirmed();
@@ -923,7 +919,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
         else if (K.runoff) st = order[0][0] > 50 ? (rank === 0 ? "Eleito" : "Não eleito") : (rank < 2 ? "2º turno" : "Não eleito");
         else st = rank < K.seats ? "Eleito" : "Não eleito";
       }
-      return { sqcand: "", n: String((k === "depest" ? 10000 : k === "depfed" ? 1000 : 10) + i * 11), nm: `${K.prop ? "Candidato" : "Candidata"} ${String.fromCharCode(65 + (i % 26))}${i >= 26 ? i : ""} ${k === "pres" ? "BR" : uf.toUpperCase()}`, cc: ["PARTIDO A", "PARTIDO B", "PARTIDO C", "PARTIDO D"][i % 4], nv: "", st, e: done && /^Eleit/.test(st) ? "s" : "n", vap: String(Math.round(valid * p / 100)), pvap: p.toFixed(2).replace(".", ",") };
+      return { sqcand: "", n: String((k === "depest" ? 10000 : k === "depfed" ? 1000 : 10) + i * 11), nm: `${K.prop ? "Candidato" : "Candidata"} ${String.fromCharCode(65 + (i % 26))}${i >= 26 ? i : ""} ${k === "pres" ? "BR" : uf.toUpperCase()}`, cc: ["PT", "PL", "PSD", "NOVO", "MDB", "UNIÃO", "PSB", "REPUBLICANOS"][i % 8], nv: "", st, e: done && /^Eleit/.test(st) ? "s" : "n", vap: String(Math.round(valid * p / 100)), pvap: p.toFixed(2).replace(".", ",") };
     });
     return { s: "20000", st: String(Math.round(200 * pst)), pst: pst.toFixed(2).replace(".", ","), tf: done ? "s" : "n", md: "n",
       c: "9800000", pc: "78,12", a: "2740000", pa: "21,88", vb: "150000", pvb: "1,62", tvn: "310000", ptvn: "3,35",
