@@ -80,6 +80,7 @@ h2.sec { font: 800 30px/1 var(--font-display); margin: 0; text-transform: upperc
 header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 14px 24px; }
 /* visor da urna */
 .status { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.lcd.stale { background: var(--corrige-soft); color: var(--corrige-ink); }
 .lcd { display: inline-flex; align-items: center; gap: 10px; background: var(--lcd); color: var(--lcd-fg); font: 500 13px/1.2 var(--font-mono); padding: 10px 14px; border-radius: 3px; box-shadow: inset 0 2px 4px rgba(0,0,0,.18); min-width: 260px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .4; display: inline-block; flex: none; }
 .dot.live { background: var(--confirma); opacity: 1; animation: pulse 1.6s ease-in-out infinite; }
@@ -284,7 +285,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       <h1>Apuração <span>ao vivo</span></h1>
     </div>
     <div class="status">
-      <span class="lcd"><span class="dot" id="dot"></span><span id="status-text">Conectando ao TSE…</span></span>
+      <span class="lcd" id="lcd"><span class="dot" id="dot"></span><span id="status-text">Conectando ao TSE…</span></span>
       <label for="interval" class="eyebrow">Atualizar a cada</label>
       <select id="interval">
         <option value="30">30 s</option>
@@ -933,6 +934,16 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     }, 250);
   }
 
+  // "dd/mm/aaaa hh:mm:ss" no horário de Brasília (UTC-3) -> Date
+  function parseTse(s) {
+    const m = /(\d\d)\/(\d\d)\/(\d{4})\s+(\d\d):(\d\d)(?::(\d\d))?/.exec(s || "");
+    return m ? new Date(Date.UTC(+m[3], m[2] - 1, +m[1], +m[4] + 3, +m[5], +(m[6] || 0))) : null;
+  }
+  // Mais recente entre o Brasil e os estados
+  function tseTime() {
+    const all = [PRES, ...UFS.flatMap(u => [S[u.id].pres, S[u.id].gov])].filter(x => x && !(x instanceof Error)).map(x => parseTse(x.when)).filter(Boolean);
+    return all.length ? new Date(Math.max(...all)) : null;
+  }
   let skipNext = false;
   async function cycle(force) {
     if (busy) return;
@@ -1009,9 +1020,21 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     saveSnap();
 
     if (tseLimited) skipNext = true;
-    const now = new Date().toLocaleTimeString("pt-BR");
+    const now = new Date().toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo" });
     dot.className = "dot " + (errors ? "err" : got ? "live" : "");
-    statusText.textContent = errors ? `${errors} consulta(s) com erro · ${now}` : got ? `Atualizado às ${now}` : `Aguardando divulgação · checado às ${now}`;
+    // Horário dos dados do próprio TSE (totalização nacional), separado da hora em que o painel consultou
+    const tse = tseTime();
+    const hhmm = d => d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+    const nat = PRES && !(PRES instanceof Error) ? PRES : null;
+    const ended = nat && nat.final;
+    const stale = tse && !ended && Date.now() - tse.getTime() > 10 * 60 * 1000;
+    $("lcd").classList.toggle("stale", !!stale);
+    const errTxt = errors ? ` · ${errors} consulta(s) com erro` : "";
+    statusText.textContent = !got ? `Aguardando divulgação · checado às ${now}`
+      : !tse ? `Atualizado às ${now}${errTxt}`
+      : ended ? `Apuração encerrada · dados do TSE de ${hhmm(tse)}`
+      : stale ? `TSE sem atualizar desde ${hhmm(tse)} · checado às ${now}${errTxt}`
+      : `Dados do TSE de ${hhmm(tse)} · checado às ${now}${errTxt}`;
     busy = false;
   }
 
