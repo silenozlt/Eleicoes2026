@@ -442,10 +442,16 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
 
   async function fetchRace(k, uf) {
     if (DEMO) return normalize(k, demoData(k, uf));
+    // Sem parâmetro na URL: o TSE responde pelo cache da CDN dele (renovado a cada ~25 s), bem mais rápido.
+    // "no-cache" faz o navegador revalidar a cada ciclo em vez de reaproveitar a cópia local.
+    // Cada consulta tem 15 s de limite e uma nova tentativa, para nenhum arquivo travar a tela.
     let res;
     for (let i = 0; i < 2; i++) {
-      try { res = await fetch(fileUrl(k, uf) + "?t=" + Date.now(), { cache: "no-store" }); break; }
-      catch (e) { if (i === 1) throw e; }
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 15000);
+      try { res = await fetch(fileUrl(k, uf), { cache: "no-cache", signal: ctl.signal }); break; }
+      catch (e) { if (i === 1) throw new Error(e.name === "AbortError" ? "TSE demorou a responder" : e.message); }
+      finally { clearTimeout(timer); }
     }
     if (res.status === 404 || res.status === 403) return null;
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -913,20 +919,44 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   // ---------- ciclo de atualização ----------
   const dot = $("dot"), statusText = $("status-text");
   let timer = null, busy = false;
+  let renderTimer = null;
+  function scheduleRender() {
+    if (renderTimer) return;
+    renderTimer = setTimeout(() => {
+      renderTimer = null;
+      UFS.forEach(u => { const p = S[u.id].pres; if (p && !(p instanceof Error)) presState(p); });
+      renderPres(); renderKpis(); renderMap(); renderStates(); renderDetail();
+    }, 250);
+  }
 
   async function cycle() {
     if (busy) return;
     busy = true;
     if (DEMO) demoTick++;
-    statusText.textContent = "Atualizando…";
-    let errors = 0, got = 0;
-    const tasks = [
-      fetchRace("pres", "br").then(n => { PRES = n; if (n) got++; }).catch(e => { PRES = e; errors++; }),
-      ...UFS.map(u => fetchRace("pres", u.id).then(n => { S[u.id].pres = n; if (n) got++; }).catch(e => { S[u.id].pres = e; errors++; })),
-      ...UFS.map(u => fetchRace("sen", u.id).then(n => { S[u.id].sen = n; }).catch(e => { S[u.id].sen = e; })),
-      ...UFS.map(u => fetchRace("gov", u.id).then(n => { S[u.id].gov = n; if (n) got++; }).catch(e => { S[u.id].gov = e; errors++; })),
+    let errors = 0, got = 0, doneCount = 0;
+    // Em caso de erro, mantém o último resultado bom em vez de apagar o estado da tela
+    const keep = (old, e) => old && !(old instanceof Error) ? old : e;
+    // Ordem de prioridade: Brasil, estado aberto no painel, depois o resto
+    const ordered = [selected, ...UFS.map(u => u.id).filter(id => id !== selected)];
+    const jobs = [
+      () => fetchRace("pres", "br").then(n => { PRES = n; if (n) got++; }).catch(e => { PRES = keep(PRES, e); errors++; }),
+      ...ordered.map(id => () => fetchRace("pres", id).then(n => { S[id].pres = n; if (n) got++; }).catch(e => { S[id].pres = keep(S[id].pres, e); errors++; })),
+      ...ordered.map(id => () => fetchRace("gov", id).then(n => { S[id].gov = n; if (n) got++; }).catch(e => { S[id].gov = keep(S[id].gov, e); errors++; })),
+      ...ordered.map(id => () => fetchRace("sen", id).then(n => { S[id].sen = n; }).catch(e => { S[id].sen = keep(S[id].sen, e); })),
     ];
-    await Promise.all(tasks);
+    const total = jobs.length;
+    statusText.textContent = `Atualizando… 0/${total}`;
+    // Até 12 consultas ao mesmo tempo; a tela é redesenhada aos poucos, conforme os dados chegam
+    let next = 0;
+    const worker = async () => {
+      while (next < jobs.length) {
+        await jobs[next++]();
+        doneCount++;
+        statusText.textContent = `Atualizando… ${doneCount}/${total}`;
+        scheduleRender();
+      }
+    };
+    await Promise.all(Array.from({ length: 12 }, worker));
 
     // Deputados: só busca nos estados com totalização encerrada e bancada ainda não fechada
     const depTasks = [];
@@ -938,15 +968,16 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
         depTasks.push(fetchRace(k, u.id).then(n => {
           S[u.id][k] = n;
           if (n && (n.done || n.md) && n.cands.some(c => c.elected)) S[u.id].depFinal[k] = true;
-        }).catch(e => { if (!S[u.id][k]) S[u.id][k] = e; }));
+        }).catch(e => { S[u.id][k] = keep(S[u.id][k], e); }));
       });
     });
     // Aba aberta no painel (senador ou deputados de um estado ainda em apuração)
     if (tab !== "gov" && tab !== "pres" && tab !== "sen" && !(KINDS[tab].prop && S[selected].depFinal[tab])) {
-      depTasks.push(fetchRace(tab, selected).then(n => { S[selected][tab] = n; }).catch(e => { S[selected][tab] = e; }));
+      depTasks.push(fetchRace(tab, selected).then(n => { S[selected][tab] = n; }).catch(e => { S[selected][tab] = keep(S[selected][tab], e); }));
     }
     await Promise.all(depTasks);
 
+    clearTimeout(renderTimer); renderTimer = null;
     UFS.forEach(u => { const p = S[u.id].pres; if (p && !(p instanceof Error)) presState(p); });
     renderPres(); renderKpis(); renderMap(); renderStates(); renderDetail();
 
