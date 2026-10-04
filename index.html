@@ -444,7 +444,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   }
 
   let tseLimited = false;
-  async function fetchRace(k, uf) {
+  async function fetchRaceRaw(k, uf) {
     if (DEMO) return normalize(k, demoData(k, uf));
     // Sem parâmetro na URL: o TSE responde pelo cache da CDN dele (renovado a cada ~25 s), bem mais rápido.
     // "no-cache" faz o navegador revalidar a cada ciclo em vez de reaproveitar a cópia local.
@@ -790,7 +790,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   async function loadSelected() {
     const uf = selected, k = tab;
     if (k === "gov" || k === "pres" || (k === "sen" && S[uf].sen !== undefined)) { renderDetail(); return; }
-    try { S[uf][k] = await fetchRace(k, uf); } catch (e) { S[uf][k] = e; }
+    try { S[uf][k] = await fetchRaceRaw(k, uf); } catch (e) { const o = S[uf][k]; S[uf][k] = o && !(o instanceof Error) ? o : e; }
     if (uf === selected && k === tab) renderDetail();
   }
 
@@ -975,11 +975,17 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     return all.length ? new Date(Math.max(...all)) : null;
   }
   let skipNext = false;
+  // iPhone/Safari congela timers e pode matar consultas quando a tela bloqueia ou o app muda.
+  // Por isso: um ciclo travado há mais de 45 s é liberado, e respostas de um ciclo antigo são descartadas.
+  let gen = 0, busySince = 0, lastDone = 0;
   async function cycle(force) {
-    if (busy) return;
+    if (busy && Date.now() - busySince < 45000) return;
     // Se o TSE respondeu "429" no ciclo anterior, espera um ciclo antes de consultar de novo
     if (skipNext && force !== true) { skipNext = false; statusText.textContent = "TSE pediu uma pausa · tento no próximo ciclo"; return; }
-    busy = true;
+    busy = true; busySince = Date.now();
+    const my = ++gen;
+    // Consulta deste ciclo: se um ciclo mais novo começou, a resposta é ignorada
+    const fetchRace = (k, uf) => fetchRaceRaw(k, uf).then(n => my === gen ? n : new Promise(() => {}), e => my === gen ? Promise.reject(e) : new Promise(() => {}));
     tseLimited = false;
     if (DEMO) demoTick++;
     let errors = 0, got = 0, doneCount = 0;
@@ -1032,6 +1038,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       depTasks.push(fetchRace(tab, selected).then(n => { S[selected][tab] = n; }).catch(e => { S[selected][tab] = keep(S[selected][tab], e); }));
     }
     await Promise.all(depTasks);
+    if (my !== gen) return;
 
     clearTimeout(renderTimer); renderTimer = null;
     UFS.forEach(u => { const p = S[u.id].pres; if (p && !(p instanceof Error)) presState(p); });
@@ -1066,6 +1073,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       : ended ? `Apuração encerrada · dados do TSE de ${hhmm(tse)}`
       : stale ? `TSE sem atualizar desde ${hhmm(tse)} · checado às ${now}${errTxt}`
       : `Dados do TSE de ${hhmm(tse)} · checado às ${now}${errTxt}`;
+    lastDone = Date.now();
     busy = false;
   }
 
@@ -1076,6 +1084,11 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   }
   $("interval").addEventListener("change", schedule);
   $("refresh").addEventListener("click", () => cycle(true));
+  // Ao voltar para a aba (desbloquear o iPhone, trocar de app), atualiza na hora em vez de esperar o próximo ciclo
+  function wake() { if (document.visibilityState === "visible" && Date.now() - lastDone > 15000) cycle(true); }
+  document.addEventListener("visibilitychange", wake);
+  window.addEventListener("pageshow", wake);
+  window.addEventListener("focus", wake);
 
   // ---------- modo demonstração (?demo) ----------
   let demoTick = 0;
