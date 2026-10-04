@@ -93,6 +93,8 @@ button { cursor: pointer; }
 button:hover { border-color: var(--fg); }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .key-confirma { background: var(--confirma); color: var(--on-confirma); border-color: transparent; text-transform: uppercase; letter-spacing: .04em; box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+#notify[aria-pressed="true"] { border-color: var(--confirma); color: var(--confirma); }
+#notify:disabled { opacity: .6; cursor: default; }
 .key-confirma:hover { border-color: transparent; filter: brightness(1.08); }
 .demo-banner { background: var(--corrige-soft); color: var(--corrige-ink); font: 500 13px var(--font-mono); padding: 10px 12px; border-radius: 4px; }
 
@@ -122,6 +124,15 @@ svg.map text.small { font-size: 8px; stroke-width: 2px; }
 svg.map .pc { font-weight: 400; font-size: 10px; }
 svg.map .small.pc, svg.map text.small .pc { font-size: 7.5px; }
 svg.map text.co { text-anchor: start; font-size: 11px; stroke-width: 0; }
+svg.map .mb { display: none; }
+svg.map .mb.e, svg.map .mb.r { display: inline; }
+svg.map .mb-c { stroke: var(--surface); stroke-width: 1.6; }
+svg.map .mb.e .mb-c { fill: var(--confirma); }
+svg.map .mb.r .mb-c { fill: var(--corrige); }
+svg.map .mb-ok { fill: none; stroke: var(--on-confirma); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: none; }
+svg.map .mb.e .mb-ok { display: inline; }
+svg.map text.mb-2 { display: none; font: 700 9px var(--font-mono); fill: #2a1a00; stroke: none; }
+svg.map .mb.r text.mb-2 { display: inline; }
 svg.map .lead { fill: none; stroke: var(--muted); stroke-width: .8; }
 svg.map .lead-dot { fill: var(--fg); stroke: none; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font: 12px var(--font-mono); color: var(--muted); margin-top: 8px; }
@@ -170,6 +181,16 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
 .tag { display: inline-block; margin-left: 6px; font: 500 10px/1 var(--font-mono); padding: 3px 5px; border-radius: 2px; vertical-align: 2px; }
 .name .tag { display: inline-block; font-size: 10px; white-space: nowrap; }
 .tag.e { background: var(--confirma); color: var(--on-confirma); }
+.ic { width: 1.15em; height: 1.15em; vertical-align: -.22em; flex: none; }
+.tag .ic, .pill .ic { width: 1.2em; height: 1.2em; margin-right: 3px; }
+.ok-ic circle { fill: var(--confirma); stroke: var(--surface); stroke-width: 1; }
+.ok-ic path { fill: none; stroke: var(--on-confirma); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tag.e .ok-ic circle, .pill.done .ok-ic circle { fill: var(--on-confirma); stroke: none; }
+.tag.e .ok-ic path, .pill.done .ok-ic path { stroke: var(--confirma); }
+.t2-ic circle { fill: var(--corrige); stroke: var(--surface); stroke-width: 1; }
+.t2-ic text { font: 700 10px var(--font-mono); fill: #2a1a00; text-anchor: middle; dominant-baseline: middle; }
+.photo-wrap { position: relative; display: inline-block; grid-row: span 3; }
+.photo-wrap .ic { position: absolute; right: -4px; bottom: -4px; width: 18px; height: 18px; }
 .tag.t2 { background: var(--corrige); color: #2a1a00; }
 .more { font: 12px var(--font-mono); color: var(--muted); }
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
@@ -189,7 +210,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
 .st-row:hover { border-color: var(--line); }
 .st-row[aria-current="true"] { border-color: var(--fg); background: var(--surface); }
 .st-row .uf { font: 800 22px/1 var(--font-display); grid-row: span 3; }
-.st-row .ph { width: 40px; height: 40px; grid-row: span 3; }
+.st-row .ph { width: 40px; height: 40px; grid-row: auto; }
 .photo.won { box-shadow: 0 0 0 2px var(--confirma); }
 .photo.t2 { box-shadow: 0 0 0 2px var(--corrige); }
 .st-row .ld { grid-column: 3 / -1; }
@@ -202,7 +223,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
 .st-row .mini.runoff div { background: var(--corrige); }
 
 /* Consolidado */
-.cons-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.cons-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; }
 .cons-group { display: grid; gap: 10px; }
 .cons-group h3 { font: 800 22px/1 var(--font-display); text-transform: uppercase; margin: 0; }
 .cons-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
@@ -269,6 +290,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
         <option value="60" selected>60 s</option>
         <option value="120">2 min</option>
       </select>
+      <button id="notify" type="button" aria-pressed="false">Avisar eleitos</button>
       <button id="refresh" type="button" class="key-confirma">Atualizar agora</button>
     </div>
   </header>
@@ -356,6 +378,8 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const initials = nm => String(nm || "?").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("");
   const yes = v => v === "s" || v === "S" || v === true;
+  const OK_IC = `<svg class="ic ok-ic" viewBox="-8 -8 16 16" aria-hidden="true"><circle r="7.5"/><path d="M-3.6 .2 L-1 2.7 L3.8 -2.6"/></svg>`;
+  const T2_IC = `<svg class="ic t2-ic" viewBox="-8 -8 16 16" aria-hidden="true"><circle r="7.5"/><text y=".5">2</text></svg>`;
   const face = (k, uf, c, cls = "") => `<span class="photo ${cls}"><span>${esc(initials(c.nm))}</span>${c.sq ? `<img alt="" loading="lazy" src="${esc(photoUrl(k, uf, c.sq))}" onerror="this.remove()">` : ""}</span>`;
   const $ = id => document.getElementById(id);
 
@@ -384,7 +408,8 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     const Ss = obj(d.s) || d, Es = obj(d.e) || d, Vs = obj(d.v) || d;
     const pst = num(Ss.pst);
     const done = yes(d.tf) || pst >= 100;
-    const md = yes(d.md) || d.md === "e" || d.md === "E";
+    const mdRaw = String(d.md || "").toUpperCase();
+    const mdE = mdRaw === "E", mdS = mdRaw === "S", md = mdE || mdS;
     const cands = rawCands(d).map(c => {
       const st = c.st || "";
       return {
@@ -397,7 +422,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     // Sem marcação do TSE mas com totalização encerrada: deduz o resultado majoritário
     if (!K.prop && (done || md) && !cands.some(c => c.elected || c.runoff)) {
       if (K.runoff) {
-        if (cands[0] && cands[0].p > 50) cands[0].elected = true;
+        if (!mdS && cands[0] && (mdE || cands[0].p > 50)) cands[0].elected = true;
         else cands.slice(0, 2).forEach(c => c.runoff = true);
       } else cands.slice(0, K.seats).forEach(c => c.elected = true);
     }
@@ -466,7 +491,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     const K = KINDS[k];
     const max = Math.max(1, ...n.cands.map(c => c.p));
     const shown = n.cands.slice(0, limit);
-    const tag = (c, i) => c.runoff ? `<span class="tag t2">2º turno</span>` : c.elected ? `<span class="tag e">${esc(/média/i.test(c.st) ? "Eleito (média)" : "Eleito")}</span>` : "";
+    const tag = (c, i) => c.runoff ? `<span class="tag t2">2º turno</span>` : c.elected ? `<span class="tag e">${OK_IC}${esc(/média/i.test(c.st) ? "Eleito (média)" : /QP/.test(c.st) ? "Eleito (QP)" : "Eleito")}</span>` : "";
     return `<ul class="cands">${shown.map((c, i) => `
       <li class="cand ${c.elected ? "won" : (!K.prop && i < (K.seats || 1)) ? "lead" : ""}">
         <div class="photo"><span>${esc(initials(c.nm))}</span>${c.sq ? `<img alt="" loading="lazy" src="${esc(photoUrl(k, uf, c.sq))}" onerror="this.remove()">` : ""}</div>
@@ -494,7 +519,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   function renderPres() {
     const el = $("pres");
     const n = PRES;
-    const pill = n ? `<span class="pill ${n.sit.cls}">${n.sit.label}</span>` : `<span class="pill wait">Aguardando</span>`;
+    const pill = n ? `<span class="pill ${n.sit.cls}">${n.sit.cls === "done" ? OK_IC : ""}${n.sit.label}</span>` : `<span class="pill wait">Aguardando</span>`;
     el.innerHTML = `
       <div class="state-head" style="margin-bottom:12px"><div><div class="eyebrow">Brasil</div><h3>Presidente</h3></div>${pill}</div>
       ${n && !(n instanceof Error) ? `<div class="detail">${progress(n)}${candList("pres", "br", n, 5)}${n.cands.length > 5 ? `<div class="more">+ ${n.cands.length - 5} candidatos com menos votos</div>` : ""}</div>` : waiting(n instanceof Error ? n.message : "")}`;
@@ -535,7 +560,15 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   const COL_X = vw + 14;
   svg.setAttribute("viewBox", `${vx} ${vy} ${vw + 78} ${vh}`);
   const labelLayer = mk("g", {}, svg);
-  const pctEls = {}, ufEls = {};
+  const pctEls = {}, ufEls = {}, badgeEls = {};
+  // Selo no mapa: verde com check = eleito; laranja com "2" = vai ao 2º turno
+  function mkBadge(x, y, small) {
+    const g = mk("g", { class: "mb", transform: `translate(${x} ${y}) scale(${small ? .75 : 1})` }, labelLayer);
+    mk("circle", { r: 6.5, class: "mb-c" }, g);
+    mk("path", { d: "M-3 .2 L-.9 2.3 L3.2 -2.2", class: "mb-ok" }, g);
+    const tx = mk("text", { y: .6, class: "mb-2" }, g); tx.textContent = "2";
+    return g;
+  }
   const center = id => { const b = paths[id].getBBox(); const [dx, dy] = NUDGE[id] || [0, 0]; return [b.x + b.width / 2 + dx, b.y + b.height / 2 + dy]; };
   MAP.locations.filter(l => !CALLOUT.includes(l.id)).forEach(l => {
     const [x, y] = center(l.id);
@@ -544,6 +577,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     ufEls[l.id] = mk("tspan", {}, t);
     const p = mk("text", { x, y: y + (small ? 4 : 6), class: "pc" + (small ? " small" : "") }, labelLayer);
     labels[l.id] = t; pctEls[l.id] = p;
+    badgeEls[l.id] = mkBadge(x + (small ? 9 : 15), y - (small ? 8 : 13), small);
   });
   let lastY = -Infinity;
   CALLOUT.map(id => [id, ...center(id)]).sort((a, b) => a[2] - b[2]).forEach(([id, x, y]) => {
@@ -554,6 +588,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     ufEls[id] = mk("tspan", {}, t);
     const p = mk("tspan", { dx: 4, class: "pc" }, t);
     labels[id] = t; pctEls[id] = p;
+    badgeEls[id] = mkBadge(COL_X + 56, ly, false);
   });
   const pctText = p => p >= 100 ? "100%" : p >= 10 ? Math.floor(p) + "%" : (Math.floor(p * 10) / 10).toLocaleString("pt-BR") + "%";
 
@@ -578,7 +613,9 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       // ✓ = eleito no estado; 2T = governo vai ao 2º turno
       const r = layer === "gov" || layer === "sen" ? S[u.id][layer] : null;
       const ok = r && !(r instanceof Error);
-      ufEls[u.id].textContent = u.id.toUpperCase() + (ok && r.sit.cls === "done" ? " ✓" : ok && r.sit.cls === "runoff" ? " 2T" : "");
+      ufEls[u.id].textContent = u.id.toUpperCase();
+      const st = ok ? r.sit.cls : "";
+      badgeEls[u.id].setAttribute("class", "mb" + (st === "done" ? " e" : st === "runoff" ? " r" : ""));
     });
     if (layer === "pst") {
       $("legend").innerHTML = [["m0", "sem dados"], ["m1", "até 25%"], ["m2", "25–50%"], ["m3", "50–75%"], ["m4", "75–99%"], ["m5", "100%"]].map(([c, t]) => `<span><i style="background:var(--${c})"></i>${t}</span>`).join("");
@@ -589,7 +626,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     UFS.forEach(u => { const l = leaderOf(layer, u.id); if (l) { const p = partyName(l.cc); count[p] = (count[p] || 0) + 1; sample[p] = l; } });
     const items = Object.keys(count).sort((a, b) => count[b] - count[a]).map(p =>
       `<span>${swatch(sample[p], 12)}${esc(p)}${layer === "pres" ? " (" + esc(sample[p].nm) + ")" : ""} · ${count[p]}</span>`);
-    const note = layer === "pres" ? "" : `<span>✓ eleito${layer === "gov" ? " · 2T 2º turno" : ""}</span>`;
+    const note = layer === "pres" ? "" : `<span>${OK_IC} eleito</span>${layer === "gov" ? `<span>${T2_IC} 2º turno</span>` : ""}`;
     $("legend").innerHTML = items.join("") + `<span><i style="background:var(--m0)"></i>sem dados</span>` + note;
   }
 
@@ -600,8 +637,8 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     tip.innerHTML = `<b>${esc(UFNAME[uf])}</b>
       <div class="row"><span>Urnas apuradas</span><span>${g && !(g instanceof Error) ? fmtPct(g.pst) : "—"}</span></div>
       ${(() => { const p = S[uf].pres, pl = p && !(p instanceof Error) ? p.cands[0] : null; return pl && pl.v ? `<div class="row" style="margin-top:4px"><span>Lidera presidente</span><span>${fmtPct(pl.p)}</span></div><div class="tip-c">${face("pres", uf, pl)}<span>${swatch(pl)}${esc(pl.nm)} <small style="font-weight:400">${esc(partyName(pl.cc))}</small></span></div>` : ""; })()}
-      ${lead ? `<div class="row" style="margin-top:4px"><span>Lidera governo</span><span>${fmtPct(lead.p)}</span></div><div class="tip-c">${face("gov", uf, lead, lead.elected ? "won" : lead.runoff ? "t2" : "")}<span>${swatch(lead)}${esc(lead.nm)} <small style="font-weight:400">${esc(partyName(lead.cc))}</small></span></div>` : ""}
-      ${(() => { const sn = S[uf].sen, top = sn && !(sn instanceof Error) && sn.cands[0]?.v ? sn.cands.slice(0, 2) : []; return top.length ? `<div class="row" style="margin-top:4px"><span>Senado (2 vagas)</span><span></span></div>` + top.map(c => `<div class="tip-c">${face("sen", uf, c, c.elected ? "won" : "")}<span>${swatch(c)}${esc(c.nm)} <small style="font-weight:400">${esc(partyName(c.cc))} · ${fmtPct(c.p)}</small></span></div>`).join("") : ""; })()}
+      ${lead ? `<div class="row" style="margin-top:4px"><span>Lidera governo</span><span>${fmtPct(lead.p)}</span></div><div class="tip-c">${face("gov", uf, lead, lead.elected ? "won" : lead.runoff ? "t2" : "")}<span>${swatch(lead)}${esc(lead.nm)} ${lead.elected ? OK_IC : lead.runoff ? T2_IC : ""} <small style="font-weight:400">${esc(partyName(lead.cc))}</small></span></div>` : ""}
+      ${(() => { const sn = S[uf].sen, top = sn && !(sn instanceof Error) && sn.cands[0]?.v ? sn.cands.slice(0, 2) : []; return top.length ? `<div class="row" style="margin-top:4px"><span>Senado (2 vagas)</span><span></span></div>` + top.map(c => `<div class="tip-c">${face("sen", uf, c, c.elected ? "won" : "")}<span>${swatch(c)}${esc(c.nm)} ${c.elected ? OK_IC : ""} <small style="font-weight:400">${esc(partyName(c.cc))} · ${fmtPct(c.p)}</small></span></div>`).join("") : ""; })()}
       ${g && !(g instanceof Error) ? `<div style="margin-top:6px"><span class="pill ${g.sit.cls}">${g.sit.label}</span></div>` : ""}`;
     tip.hidden = false;
     const box = $("map-wrap").getBoundingClientRect();
@@ -630,8 +667,8 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       const sw = lead ? swatch(lead, 9) : "";
       return `<button type="button" class="st-row" data-uf="${u.id}" aria-current="${u.id === selected}">
         <span class="uf">${u.id.toUpperCase()}</span>
-        ${lead ? face(listKind, u.id, lead, "ph" + (lead.elected ? " won" : lead.runoff ? " t2" : "")) : `<span class="photo ph"></span>`}
-        <span class="nm">${esc(u.name)} ${ok && g.sit.cls && listKind !== "pres" ? `<span class="tag ${g.sit.cls === "done" ? "e" : "t2"}">${g.sit.label}</span>` : ""}</span>
+        <span class="photo-wrap">${lead ? face(listKind, u.id, lead, "ph" + (lead.elected ? " won" : lead.runoff ? " t2" : "")) : `<span class="photo ph"></span>`}${lead?.elected ? OK_IC : lead?.runoff ? T2_IC : ""}</span>
+        <span class="nm">${esc(u.name)}</span>
         <span class="pp">${ok ? fmtPct(g.pst) : "—"}</span>
         <span class="ld">${lead ? `${sw}${esc(lead.nm)} (${esc(partyName(lead.cc))}) · ${fmtPct(lead.p)}${lead.elected ? " · eleito" : ""}` : "aguardando"}</span>
         <span class="mini ${ok && listKind !== "pres" ? g.sit.cls : ""}"><div style="width:${ok ? Math.min(100, g.pst) : 0}%"></div></span>
@@ -673,7 +710,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
 
     if (!KINDS[tab].prop) {
       top.innerHTML = `<div class="detail">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="eyebrow">${titleOf(tab, selected)}${tab === "sen" ? " · 2 vagas" : ""}</span><span class="pill ${n.sit.cls}">${n.sit.label}</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="eyebrow">${titleOf(tab, selected)}${tab === "sen" ? " · 2 vagas" : ""}</span><span class="pill ${n.sit.cls}">${n.sit.cls === "done" ? OK_IC : ""}${n.sit.label}</span></div>
         ${progress(n)}${candList(tab, selected, n, 8)}
         ${n.cands.length > 8 ? `<div class="more">+ ${n.cands.length - 8} candidatos com menos votos</div>` : ""}
         ${stats(n)}<div class="more">Dados do TSE de ${esc(n.when)}</div></div>`;
@@ -685,7 +722,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     elected.forEach(c => { const p = String(c.cc || "?").split(" - ")[0].trim(); byParty[p] = (byParty[p] || 0) + 1; });
     const parties = Object.entries(byParty).sort((a, b) => b[1] - a[1]);
     top.innerHTML = `<div class="detail">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="eyebrow">${titleOf(tab, selected)} · ${fmtInt(n.cands.length)} candidatos</span><span class="pill ${n.sit.cls}">${n.sit.label}</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="eyebrow">${titleOf(tab, selected)} · ${fmtInt(n.cands.length)} candidatos</span><span class="pill ${n.sit.cls}">${n.sit.cls === "done" ? OK_IC : ""}${n.sit.label}</span></div>
       ${progress(n)}
       ${elected.length
         ? `<div><div class="eyebrow" style="margin-bottom:6px">${elected.length} eleitos · por partido</div><div class="parties">${parties.map(([p, c]) => `<span class="party">${esc(p)} <b>${c}</b></span>`).join("")}</div></div>`
@@ -724,6 +761,8 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     UFS.forEach(u => {
       const g = S[u.id].gov;
       if (g && !(g instanceof Error)) g.cands.filter(c => c.elected).forEach(c => out.push({ key: `gov:${u.id}:${c.n}`, kind: "gov", uf: u.id, c, p: g }));
+      const sn = S[u.id].sen;
+      if (sn && !(sn instanceof Error)) sn.cands.filter(c => c.elected).forEach(c => out.push({ key: `sen:${u.id}:${c.n}`, kind: "sen", uf: u.id, c, p: sn }));
       ["depfed", "depest"].forEach(k => {
         const d = S[u.id][k];
         if (d && !(d instanceof Error) && (d.done || d.md)) {
@@ -740,23 +779,25 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     const runoffs = UFS.filter(u => { const g = S[u.id].gov; return g && !(g instanceof Error) && g.sit.cls === "runoff"; });
     const fed = conf.filter(x => x.kind === "depfed"), est = conf.filter(x => x.kind === "depest");
     const pres = conf.filter(x => x.kind === "pres");
+    const sens = conf.filter(x => x.kind === "sen");
     const presRunoff = PRES && !(PRES instanceof Error) && PRES.sit.cls === "runoff";
     const sum = arr => arr.reduce((s, x) => s + x.list.length, 0);
     $("cons-kpis").innerHTML = `
       <div class="kpi"><span class="eyebrow">Presidência</span><b style="font-size:28px">${pres.length ? "Definida" : presRunoff ? "2º turno" : "Em aberto"}</b></div>
       <div class="kpi"><span class="eyebrow">Governadores eleitos</span><b>${govs.length}<span class="of"> / 27</span></b></div>
+      <div class="kpi"><span class="eyebrow">Senadores eleitos</span><b>${sens.length}<span class="of"> / 54</span></b></div>
       <div class="kpi"><span class="eyebrow">Deputados federais</span><b>${fmtInt(sum(fed))}</b><small>${fed.length} de 27 bancadas fechadas</small></div>
       <div class="kpi"><span class="eyebrow">Deputados estaduais/distritais</span><b>${fmtInt(sum(est))}</b><small>${est.length} de 27 assembleias fechadas</small></div>`;
 
     const now = Date.now();
     const cls = x => freshKeys.has(x.key) && now - freshKeys.get(x.key) < 8000 ? " new" : "";
     const candCard = x => `<div class="won-card has-ph${cls(x)}">${face(x.kind, x.uf, x.c, "won")}<div class="wc-body">
-        <span class="k">${x.kind === "pres" ? "Presidente eleito" : "Governador · " + x.uf.toUpperCase()}</span>
+        <span class="k">${OK_IC} ${x.kind === "pres" ? "Presidente eleito" : (x.kind === "sen" ? "Senador · " : "Governador · ") + x.uf.toUpperCase()}</span>
         <strong>${esc(x.c.nm)}</strong>
         <span>${esc(x.c.n)} · ${esc(x.c.cc || "")}</span>
         <span>${fmtPct(x.c.p)} dos válidos · ${fmtInt(x.c.v)} votos</span></div></div>`;
     const benchCard = x => `<div class="won-card${cls(x)}">
-        <span class="k">${esc(UFNAME[x.uf])}</span>
+        <span class="k">${OK_IC} ${esc(UFNAME[x.uf])}</span>
         <strong>${x.list.length} eleitos</strong>
         <span>Mais votado: ${esc(x.list.slice().sort((a, b) => b.v - a.v)[0].nm)}</span>
         <details><summary>Ver lista</summary><ol>${x.list.slice().sort((a, b) => b.v - a.v).map(c => `<li>${esc(c.nm)} <span style="color:var(--muted)">(${esc(String(c.cc || "").split(" - ")[0])}, ${fmtInt(c.v)})</span></li>`).join("")}</ol></details></div>`;
@@ -765,6 +806,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     $("cons-body").innerHTML = [
       group("Presidente", pres.map(candCard), presRunoff ? `Haverá 2º turno entre ${esc(PRES.cands.filter(c => c.runoff).map(c => c.nm).join(" e "))}.` : "Ainda sem confirmação do TSE."),
       group("Governadores eleitos no 1º turno", sortUf(govs).map(candCard), "Nenhum governador confirmado ainda."),
+      group("Senadores eleitos", sortUf(sens).map(candCard), "Nenhum senador confirmado ainda."),
       runoffs.length ? group("Governo vai ao 2º turno", runoffs.map(u => `<div class="won-card runoff"><span class="k">${u.id.toUpperCase()} · 2º turno</span><strong>${esc(UFNAME[u.id])}</strong><span>${esc(S[u.id].gov.cands.filter(c => c.runoff).map(c => c.nm).join(" × "))}</span><span class="duo">${S[u.id].gov.cands.filter(c => c.runoff).map(c => face("gov", u.id, c, "t2")).join("")}</span></div>`), "") : "",
       group("Deputados federais", sortUf(fed).map(benchCard), "Nenhuma bancada federal fechada ainda. Elas aparecem quando o TSE termina a totalização de cada estado."),
       group("Deputados estaduais e distritais", sortUf(est).map(benchCard), "Nenhuma assembleia fechada ainda."),
@@ -772,23 +814,63 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     $("cons-updated").textContent = "Atualizado às " + new Date().toLocaleTimeString("pt-BR");
   }
 
+  // ---------- avisos do navegador ----------
+  // Com os avisos ligados, cada eleito confirmado também vira uma notificação do sistema,
+  // que aparece mesmo com a aba em segundo plano.
+  const canNotify = "Notification" in window;
+  let notifyOn = false;
+  try { notifyOn = canNotify && Notification.permission === "granted" && localStorage.getItem("avisos") === "1"; } catch {}
+  const nb = $("notify");
+  function setNotifyUi() {
+    const denied = canNotify && Notification.permission === "denied";
+    nb.innerHTML = !canNotify ? "Avisos indisponíveis" : denied ? "Avisos bloqueados" : notifyOn ? `${OK_IC} Avisos ligados` : "Avisar eleitos";
+    nb.setAttribute("aria-pressed", String(notifyOn));
+    nb.disabled = !canNotify || denied;
+    nb.title = !canNotify ? "Este navegador não permite notificações" : denied ? "Libere as notificações deste site nas configurações do navegador" : notifyOn ? "Clique para desligar os avisos" : "Receber uma notificação quando o TSE confirmar um eleito";
+  }
+  function systemNotify(title, body, icon) {
+    if (!notifyOn) return;
+    try { const n = new Notification(title, { body, icon, tag: title }); n.onclick = () => { window.focus(); n.close(); }; } catch {}
+  }
+  nb.addEventListener("click", async () => {
+    if (!canNotify) return;
+    if (notifyOn) notifyOn = false;
+    else {
+      const p = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
+      notifyOn = p === "granted";
+      if (notifyOn) systemNotify("Avisos ligados", "Você vai receber um aviso quando o TSE confirmar um eleito.");
+    }
+    try { localStorage.setItem("avisos", notifyOn ? "1" : "0"); } catch {}
+    setNotifyUi();
+  });
+  setNotifyUi();
+
   // ---------- celebração ----------
   const queue = [];
   let showing = false;
-  function celebrate(x) { queue.push(x); if (!showing) nextCelebration(); }
+  function describe(x) {
+    const isBench = !!x.list;
+    const title = x.kind === "pres" ? "Presidente eleito do Brasil"
+      : x.kind === "gov" ? `Eleito governador · ${UFNAME[x.uf]}`
+      : x.kind === "sen" ? `Eleito senador · ${UFNAME[x.uf]}`
+      : x.kind === "depfed" ? `Bancada federal definida · ${UFNAME[x.uf]}`
+      : `${x.uf === "df" ? "Câmara Legislativa" : "Assembleia"} definida · ${UFNAME[x.uf]}`;
+    const big = isBench ? `${x.list.length} eleitos` : x.c.nm;
+    const sub = isBench ? `Mais votado: ${x.list.slice().sort((a, b) => b.v - a.v)[0].nm}` : `${partyName(x.c.cc)} · ${fmtPct(x.c.p)} dos votos válidos`;
+    return { isBench, title, big, sub };
+  }
+  function celebrate(x) {
+    const d = describe(x);
+    systemNotify(d.title, `${d.big} · ${d.sub}`, !d.isBench && x.c.sq ? photoUrl(x.kind, x.uf, x.c.sq) : undefined);
+    queue.push(x); if (!showing) nextCelebration();
+  }
   function nextCelebration() {
     const x = queue.shift();
     if (!x) { showing = false; return; }
     showing = true;
     const root = $("cel-root");
-    const isBench = !!x.list;
     const kicker = "CONFIRMADO PELO TSE";
-    const title = x.kind === "pres" ? "Presidente eleito do Brasil"
-      : x.kind === "gov" ? `Eleito governador · ${UFNAME[x.uf]}`
-      : x.kind === "depfed" ? `Bancada federal definida · ${UFNAME[x.uf]}`
-      : `${x.uf === "df" ? "Câmara Legislativa" : "Assembleia"} definida · ${UFNAME[x.uf]}`;
-    const big = isBench ? `${x.list.length} eleitos` : x.c.nm;
-    const sub = isBench ? `Mais votado: ${x.list.slice().sort((a, b) => b.v - a.v)[0].nm}` : `${x.c.cc || ""} · ${fmtPct(x.c.p)} dos votos válidos`;
+    const { isBench, title, big, sub } = describe(x);
     const photo = !isBench && x.c.sq ? `<div class="cel-photo"><img alt="" src="${esc(photoUrl(x.kind, x.uf, x.c.sq))}" onerror="this.parentNode.remove()"></div>` : "";
     root.innerHTML = `<div class="celebrate" role="status" aria-live="polite"><div class="cel-card"><div class="cel-screen">
       <span class="k">${kicker}</span>${photo}<h3>${esc(title)}</h3><strong>${esc(big)}</strong><p>${esc(sub)}</p></div>
@@ -874,7 +956,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     renderConsolidated(conf);
     if (!firstLoad) {
       // Presidente primeiro, depois governadores, depois bancadas
-      const order = { pres: 0, gov: 1, depfed: 2, depest: 3 };
+      const order = { pres: 0, gov: 1, sen: 2, depfed: 3, depest: 4 };
       fresh.sort((a, b) => order[a.kind] - order[b.kind]).forEach(celebrate);
     }
     firstLoad = false;
