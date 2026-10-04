@@ -284,8 +284,8 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       <div class="map-tools">
         <h2 class="sec">Brasil</h2>
         <div class="seg" role="group" aria-label="Cor do mapa">
-          <button type="button" id="layer-pst" aria-pressed="true">Urnas apuradas</button>
-          <button type="button" id="layer-pres" aria-pressed="false">Presidente</button>
+          <button type="button" id="layer-pst" aria-pressed="false">Urnas apuradas</button>
+          <button type="button" id="layer-pres" aria-pressed="true">Presidente</button>
           <button type="button" id="layer-gov" aria-pressed="false">Governador</button>
           <button type="button" id="layer-sen" aria-pressed="false">Senador</button>
         </div>
@@ -432,7 +432,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   let PRES;
   let selected = (location.hash.replace("#", "") in S) ? location.hash.replace("#", "") : "mg";
   let tab = "gov";
-  let layer = "pst";
+  let layer = "pres";
   let listKind = "gov";
   // Cor fixa por candidato a presidente (pelo número), atribuída na ordem em que aparecem
   // Cores de partido (as tradicionais de cada legenda). Partido sem cor definida fica cinza.
