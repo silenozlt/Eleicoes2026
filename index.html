@@ -7,7 +7,8 @@
 <script data-goatcounter="https://silenozlt.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Big+Shoulders+Display:wght@700;800&family=Chivo+Mono:wght@400;500&display=swap">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Big+Shoulders+Display:wght@700;800&family=Chivo+Mono:wght@400;500&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Big+Shoulders+Display:wght@700;800&family=Chivo+Mono:wght@400;500&display=swap"></noscript>
 <style>
 /* Direção: a urna eletrônica. Corpo de plástico cinza-claro, visor de cristal líquido, teclas pretas,
    CONFIRMA verde = eleito, CORRIGE laranja = 2º turno. Dados em azul-tinta; mapa em escala de azul.
@@ -432,7 +433,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     else if (cands.some(c => c.elected)) sit = { cls: "", label: "Em apuração" };
     if (pst === 0 && !cands.some(c => c.v > 0)) sit = { cls: "wait", label: "Sem votos" };
     return {
-      k, pst, done, md, sit, cands,
+      k, pst, done, md, sit, cands, final: yes(d.tf),
       s: int(Ss.ts ?? Ss.s), st: int(Ss.st),
       c: int(Es.c), pc: num(Es.pc), a: int(Es.a), pa: num(Es.pa),
       vb: int(Vs.vb), pvb: num(Vs.pvb), tvn: int(Vs.tvn ?? Vs.vn), ptvn: num(Vs.ptvn ?? Vs.pvn),
@@ -440,6 +441,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     };
   }
 
+  let tseLimited = false;
   async function fetchRace(k, uf) {
     if (DEMO) return normalize(k, demoData(k, uf));
     // Sem parâmetro na URL: o TSE responde pelo cache da CDN dele (renovado a cada ~25 s), bem mais rápido.
@@ -453,6 +455,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       catch (e) { if (i === 1) throw new Error(e.name === "AbortError" ? "TSE demorou a responder" : e.message); }
       finally { clearTimeout(timer); }
     }
+    if (res.status === 429) { tseLimited = true; throw new Error("TSE limitou as consultas"); }
     if (res.status === 404 || res.status === 403) return null;
     if (!res.ok) throw new Error("HTTP " + res.status);
     return normalize(k, await res.json());
@@ -667,8 +670,9 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   $("list-gov").addEventListener("click", () => setList("gov"));
 
   // ---------- tabela dos estados ----------
+  const setHTML = (el, h) => { if (el.__h !== h) { el.innerHTML = h; el.__h = h; } };
   function renderStates() {
-    $("states").innerHTML = UFS.map(u => {
+    setHTML($("states"), UFS.map(u => {
       const g = S[u.id][listKind], ok = g && !(g instanceof Error), lead = ok && g.cands[0]?.v ? g.cands[0] : null;
       const sw = lead ? swatch(lead, 9) : "";
       return `<button type="button" class="st-row" data-uf="${u.id}" aria-current="${u.id === selected}">
@@ -679,7 +683,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
         <span class="ld">${lead ? `${sw}${esc(lead.nm)} (${esc(partyName(lead.cc))}) · ${fmtPct(lead.p)}${lead.elected ? " · eleito" : ""}` : "aguardando"}</span>
         <span class="mini ${ok && listKind !== "pres" ? g.sit.cls : ""}"><div style="width:${ok ? Math.min(100, g.pst) : 0}%"></div></span>
       </button>`;
-    }).join("");
+    }).join(""));
   }
   $("states").addEventListener("click", ev => { const b = ev.target.closest("[data-uf]"); if (b) { select(b.dataset.uf); $("state-panel").scrollIntoView({ behavior: "smooth", block: "start" }); } });
 
@@ -929,9 +933,13 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     }, 250);
   }
 
-  async function cycle() {
+  let skipNext = false;
+  async function cycle(force) {
     if (busy) return;
+    // Se o TSE respondeu "429" no ciclo anterior, espera um ciclo antes de consultar de novo
+    if (skipNext && force !== true) { skipNext = false; statusText.textContent = "TSE pediu uma pausa · tento no próximo ciclo"; return; }
     busy = true;
+    tseLimited = false;
     if (DEMO) demoTick++;
     let errors = 0, got = 0, doneCount = 0;
     // Em caso de erro, mantém o último resultado bom em vez de apagar o estado da tela
@@ -940,9 +948,10 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     const ordered = [selected, ...UFS.map(u => u.id).filter(id => id !== selected)];
     const jobs = [
       () => fetchRace("pres", "br").then(n => { PRES = n; if (n) got++; }).catch(e => { PRES = keep(PRES, e); errors++; }),
-      ...ordered.map(id => () => fetchRace("pres", id).then(n => { S[id].pres = n; if (n) got++; }).catch(e => { S[id].pres = keep(S[id].pres, e); errors++; })),
-      ...ordered.map(id => () => fetchRace("gov", id).then(n => { S[id].gov = n; if (n) got++; }).catch(e => { S[id].gov = keep(S[id].gov, e); errors++; })),
-      ...ordered.map(id => () => fetchRace("sen", id).then(n => { S[id].sen = n; }).catch(e => { S[id].sen = keep(S[id].sen, e); })),
+      // Cargo de estado com totalização final do TSE não muda mais: deixa de ser consultado
+      ...ordered.filter(id => !S[id].pres?.final).map(id => () => fetchRace("pres", id).then(n => { S[id].pres = n; if (n) got++; }).catch(e => { S[id].pres = keep(S[id].pres, e); errors++; })),
+      ...ordered.filter(id => !S[id].gov?.final).map(id => () => fetchRace("gov", id).then(n => { S[id].gov = n; if (n) got++; }).catch(e => { S[id].gov = keep(S[id].gov, e); errors++; })),
+      ...ordered.filter(id => !S[id].sen?.final).map(id => () => fetchRace("sen", id).then(n => { S[id].sen = n; }).catch(e => { S[id].sen = keep(S[id].sen, e); })),
     ];
     const total = jobs.length;
     statusText.textContent = `Atualizando… 0/${total}`;
@@ -992,6 +1001,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     }
     firstLoad = false;
 
+    if (tseLimited) skipNext = true;
     const now = new Date().toLocaleTimeString("pt-BR");
     dot.className = "dot " + (errors ? "err" : got ? "live" : "");
     statusText.textContent = errors ? `${errors} consulta(s) com erro · ${now}` : got ? `Atualizado às ${now}` : `Aguardando divulgação · checado às ${now}`;
@@ -1004,7 +1014,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     timer = setInterval(cycle, sec * 1000);
   }
   $("interval").addEventListener("change", schedule);
-  $("refresh").addEventListener("click", cycle);
+  $("refresh").addEventListener("click", () => cycle(true));
 
   // ---------- modo demonstração (?demo) ----------
   let demoTick = 0;
