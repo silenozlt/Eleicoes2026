@@ -438,6 +438,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       s: int(Ss.ts ?? Ss.s), st: int(Ss.st),
       c: int(Es.c), pc: num(Es.pc), a: int(Es.a), pa: num(Es.pa),
       vb: int(Vs.vb), pvb: num(Vs.pvb), tvn: int(Vs.tvn ?? Vs.vn), ptvn: num(Vs.ptvn ?? Vs.pvn),
+      tv: int(Vs.tv), vv: int(Vs.vvc ?? Vs.vv),
       when: d.dt ? `${d.dt} ${d.ht || ""}`.trim() : `${d.dg || ""} ${d.hg || ""}`.trim(),
     };
   }
@@ -464,7 +465,33 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
 
   // ---------- estado da página ----------
   const S = Object.fromEntries(UFS.map(u => [u.id, { pres: undefined, gov: undefined, sen: undefined, depfed: undefined, depest: undefined, depFinal: { depfed: false, depest: false } }]));
-  let PRES;
+  let PRES, PRES_ZZ; // presidente: total nacional oficial e votos do exterior
+  const fmtHM = d => d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+  // Quando o total nacional do TSE está mais velho que os arquivos dos estados, mostra a soma
+  // dos 27 estados + exterior. Eleito e 2º turno continuam vindo só do total oficial.
+  function presView() {
+    const off = PRES && !(PRES instanceof Error) ? PRES : null;
+    const parts = [...UFS.map(u => S[u.id].pres), PRES_ZZ];
+    if (parts.some(x => !x || x instanceof Error || x.vv === undefined)) return { n: PRES, summed: false };
+    const latest = Math.max(...UFS.map(u => parseTse(S[u.id].pres.when)?.getTime() || 0));
+    const offT = off ? parseTse(off.when)?.getTime() || 0 : 0;
+    if (off && (off.final || offT >= latest)) return { n: off, summed: false };
+    const sum = k => parts.reduce((s, x) => s + (x[k] || 0), 0);
+    const votes = {}, info = {};
+    parts.forEach(x => x.cands.forEach(c => { votes[c.n] = (votes[c.n] || 0) + c.v; if (!info[c.n]) info[c.n] = c; }));
+    const vv = sum("vv"), tv = sum("tv"), s = sum("s"), st = sum("st"), c = sum("c"), a = sum("a"), vb = sum("vb"), tvn = sum("tvn");
+    const flags = off ? Object.fromEntries(off.cands.map(x => [x.n, x])) : {};
+    const cands = Object.keys(votes).map(k => ({ ...info[k], v: votes[k], p: vv ? votes[k] / vv * 100 : 0, elected: !!flags[k]?.elected, runoff: !!flags[k]?.runoff }))
+      .sort((x, y) => y.v - x.v);
+    const n = {
+      k: "pres", pst: s ? st / s * 100 : 0, done: false, md: false, final: false, cands, s, st, c, a, vb, tvn,
+      pc: c + a ? c / (c + a) * 100 : 0, pa: c + a ? a / (c + a) * 100 : 0,
+      pvb: tv ? vb / tv * 100 : 0, ptvn: tv ? tvn / tv * 100 : 0,
+      sit: off && off.sit.cls && off.sit.cls !== "wait" ? off.sit : { cls: "", label: "Em apuração" },
+      when: `soma dos estados, TSE de ${fmtHM(new Date(latest))}`,
+    };
+    return { n, summed: true, latest: new Date(latest), offWhen: off ? parseTse(off.when) : null };
+  }
   let selected = (location.hash.replace("#", "") in S) ? location.hash.replace("#", "") : "mg";
   let tab = "gov";
   let layer = "pres";
@@ -528,10 +555,12 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
 
   function renderPres() {
     const el = $("pres");
-    const n = PRES;
+    const view = presView();
+    const n = view.n;
     const pill = n ? `<span class="pill ${n.sit.cls}">${n.sit.cls === "done" ? OK_IC : ""}${n.sit.label}</span>` : `<span class="pill wait">Aguardando</span>`;
     el.innerHTML = `
-      <div class="state-head" style="margin-bottom:12px"><div><div class="eyebrow">Brasil</div><h3>Presidente</h3></div>${pill}</div>
+      <div class="state-head" style="margin-bottom:12px"><div><div class="eyebrow">${view.summed ? `Brasil · soma dos 27 estados e exterior · TSE de ${fmtHM(view.latest)}` : "Brasil"}</div><h3>Presidente</h3></div>${pill}</div>
+      ${view.summed ? `<div class="more" style="margin:-4px 0 12px">O total nacional do TSE está parado${view.offWhen ? " desde " + fmtHM(view.offWhen) : ""}. Enquanto isso, o painel soma os resultados mais recentes de cada estado e do exterior. Eleito e 2º turno só aparecem quando o TSE confirmar.</div>` : ""}
       ${n && !(n instanceof Error) ? `<div class="detail">${progress(n)}${candList("pres", "br", n, 5)}${n.cands.length > 5 ? `<div class="more">+ ${n.cands.length - 5} candidatos com menos votos</div>` : ""}</div>` : waiting(n instanceof Error ? n.message : "")}`;
   }
 
@@ -540,7 +569,8 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     const defined = govs.filter(g => g.sit.cls === "done").length;
     const runoff = govs.filter(g => g.sit.cls === "runoff").length;
     const avg = govs.length ? govs.reduce((s, g) => s + g.pst, 0) / UFS.length : 0;
-    const p = PRES && !(PRES instanceof Error) ? PRES : null;
+    const pv = presView().n;
+    const p = pv && !(pv instanceof Error) ? pv : null;
     $("kpis").innerHTML = `
       <div class="kpi"><span class="eyebrow">Urnas apuradas · Brasil</span><b>${p ? fmtPct(p.pst) : "—"}</b><small>${p ? fmtInt(p.st) + " de " + fmtInt(p.s) + " seções" : "aguardando o TSE"}</small></div>
       <div class="kpi"><span class="eyebrow">Média dos estados</span><b>${govs.length ? fmtPct(avg) : "—"}</b><small>governador, 27 UFs</small></div>
@@ -966,6 +996,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       () => fetchRace("pres", "br").then(n => { PRES = n; if (n) got++; }).catch(e => { PRES = keep(PRES, e); errors++; }),
       ...["pres", "gov", "sen"].filter(k => want(k, selected)).map(k => job(k, selected)),
       ...others.filter(id => want("pres", id)).map(id => job("pres", id)),
+      () => fetchRace("pres", "zz").then(n => { PRES_ZZ = n; }).catch(e => { PRES_ZZ = keep(PRES_ZZ, e); }),
       ...others.filter(id => want("gov", id)).map(id => job("gov", id)),
       ...others.filter(id => want("sen", id)).map(id => job("sen", id)),
     ];
@@ -1082,13 +1113,13 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
 
   // ---------- últimos dados guardados no aparelho ----------
   // Ao abrir de novo, mostra na hora o último resultado visto (até 6 h atrás) e atualiza por trás.
-  const SNAP_KEY = "apuracao2026:v1";
+  const SNAP_KEY = "apuracao2026:v2";
   let statusPrefix = "";
   function saveSnap() {
     if (DEMO) return;
     try {
       const ok = x => x && !(x instanceof Error) ? x : undefined;
-      localStorage.setItem(SNAP_KEY, JSON.stringify({ t: Date.now(), PRES: ok(PRES),
+      localStorage.setItem(SNAP_KEY, JSON.stringify({ t: Date.now(), PRES: ok(PRES), PRES_ZZ: ok(PRES_ZZ),
         S: Object.fromEntries(UFS.map(u => [u.id, { pres: ok(S[u.id].pres), gov: ok(S[u.id].gov), sen: ok(S[u.id].sen) }])) }));
     } catch {}
   }
@@ -1098,6 +1129,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       const d = JSON.parse(localStorage.getItem(SNAP_KEY) || "null");
       if (!d || !d.t || Date.now() - d.t > 6 * 3600e3) return null;
       if (d.PRES) PRES = d.PRES;
+      if (d.PRES_ZZ) PRES_ZZ = d.PRES_ZZ;
       UFS.forEach(u => { const s = d.S && d.S[u.id]; if (s) ["pres", "gov", "sen"].forEach(k => { if (s[k]) S[u.id][k] = s[k]; }); });
       return d.t;
     } catch { return null; }
