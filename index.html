@@ -245,6 +245,32 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
 @keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes glow { 0%, 40% { box-shadow: 0 0 0 3px var(--confirma); } 100% { box-shadow: 0 0 0 0 transparent; } }
 
+/* Analítico: desempenho por partido */
+.ana-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.ana-controls select { min-width: 200px; }
+.ana-controls input[type="search"] { max-width: 260px; }
+.ana-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ana-table th {
+  font: 500 11px/1.2 var(--font-mono); color: var(--muted); text-align: left;
+  padding: 8px 10px; border-bottom: 2px solid var(--line); white-space: nowrap;
+  cursor: pointer; user-select: none;
+}
+.ana-table th:hover { color: var(--fg); }
+.ana-table th .sa { font-size: 9px; margin-left: 3px; opacity: .4; }
+.ana-table th[aria-sort] .sa { opacity: 1; }
+.ana-table td { padding: 7px 10px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.ana-table td:first-child { font-weight: 700; }
+.ana-table tr:hover td { background: var(--bg); }
+.ana-table tr.hl td { background: var(--ink-soft); }
+.ana-table .n { text-align: right; font-family: var(--font-mono); font-size: 12px; }
+.ana-bar { display: inline-block; height: 14px; background: var(--ink); border-radius: 2px; min-width: 2px; vertical-align: -2px; margin-right: 6px; transition: width .4s ease; }
+.ana-detail { display: grid; gap: 14px; margin-top: 14px; }
+.ana-detail-head { font: 800 22px/1 var(--font-display); text-transform: uppercase; margin: 0; }
+.ana-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.ana-chips span { font: 12px var(--font-mono); background: var(--bg); padding: 3px 7px; border-radius: 3px; }
+.ana-chips b { color: var(--ink); }
+.ana-empty { font: 13px var(--font-mono); color: var(--muted); padding: 12px 0; }
+
 /* Celebração: a tela da urna depois do CONFIRMA */
 #confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 40; }
 .celebrate { position: fixed; inset: 0; display: grid; place-items: center; background: var(--scrim); z-index: 30; padding: 16px; animation: fade .3s ease both; }
@@ -266,6 +292,13 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
 @media (max-width: 1020px) {
   .national, .geo { grid-template-columns: 1fr; }
   .cons-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  .ana-table { font-size: 12px; }
+  .ana-table th, .ana-table td { padding: 6px 5px; }
+  .ana-controls { flex-direction: column; }
+  .ana-controls select, .ana-controls input[type="search"] { max-width: 100%; width: 100%; }
+  .ana-detail .cons-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 480px) {
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -338,6 +371,21 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     <div class="sec-head"><h2 class="sec">Consolidado · eleitos confirmados pelo TSE</h2><span class="eyebrow" id="cons-updated"></span></div>
     <div class="cons-kpis" id="cons-kpis"></div>
     <div id="cons-body" style="display:grid;gap:20px"></div>
+  </section>
+
+  <section class="panel" style="display:grid;gap:18px" id="analitico">
+    <div class="sec-head">
+      <h2 class="sec">Desempenho por partido</h2>
+      <span class="eyebrow" id="ana-updated"></span>
+    </div>
+    <div class="ana-controls">
+      <select id="ana-scope" aria-label="Escopo da análise">
+        <option value="brasil">Brasil (todas as UFs)</option>
+      </select>
+      <input type="search" id="ana-filter" placeholder="Filtrar partido" aria-label="Filtrar partido">
+    </div>
+    <div id="ana-body"></div>
+    <div id="ana-detail"></div>
   </section>
 
   <footer class="foot">
@@ -886,6 +934,225 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   });
   setNotifyUi();
 
+  // ---------- analítico: desempenho por partido ----------
+  const partyOf = c => String(c.cc || "?").split(" - ")[0].trim();
+
+  function aggregateParties(scope) {
+    const parties = {};
+    const ensure = name => {
+      if (!parties[name]) parties[name] = {
+        govWon: [], govRunoff: [], govLead: [], senElected: [],
+        depfed: 0, depest: 0,
+        presVotes: 0, govVotes: 0, depfedVotes: 0, depestVotes: 0, totalVotes: 0,
+      };
+      return parties[name];
+    };
+    const ufs = scope === "brasil" ? UFS : UFS.filter(u => u.id === scope);
+
+    // Presidente (só no escopo Brasil)
+    if (scope === "brasil" && PRES && !(PRES instanceof Error)) {
+      PRES.cands.forEach(c => {
+        const p = ensure(partyOf(c));
+        p.presVotes += c.v; p.totalVotes += c.v;
+      });
+    }
+
+    ufs.forEach(u => {
+      const st = S[u.id];
+      // Governador
+      const g = st.gov;
+      if (g && !(g instanceof Error)) {
+        g.cands.forEach((c, i) => {
+          const p = ensure(partyOf(c));
+          p.govVotes += c.v; p.totalVotes += c.v;
+          if (c.elected) p.govWon.push({ uf: u.id, nm: c.nm, pct: c.p, v: c.v });
+          else if (c.runoff) p.govRunoff.push({ uf: u.id, nm: c.nm });
+          else if (i === 0 && !g.cands.some(x => x.elected || x.runoff)) p.govLead.push({ uf: u.id, nm: c.nm, pct: c.p });
+        });
+      }
+      // Senador
+      const sn = st.sen;
+      if (sn && !(sn instanceof Error)) {
+        sn.cands.forEach(c => {
+          const p = ensure(partyOf(c));
+          p.totalVotes += c.v;
+          if (c.elected) p.senElected.push({ uf: u.id, nm: c.nm, v: c.v });
+        });
+      }
+      // Deputados federais
+      const df = st.depfed;
+      if (df && !(df instanceof Error)) {
+        df.cands.forEach(c => {
+          const p = ensure(partyOf(c));
+          p.depfedVotes += c.v; p.totalVotes += c.v;
+          if (c.elected) p.depfed++;
+        });
+      }
+      // Deputados estaduais
+      const de = st.depest;
+      if (de && !(de instanceof Error)) {
+        de.cands.forEach(c => {
+          const p = ensure(partyOf(c));
+          p.depestVotes += c.v; p.totalVotes += c.v;
+          if (c.elected) p.depest++;
+        });
+      }
+    });
+
+    return Object.entries(parties).map(([name, d]) => ({ name, ...d })).sort((a, b) => b.totalVotes - a.totalVotes);
+  }
+
+  let anaSort = { col: "votes", dir: "desc" };
+  let anaPartyDetail = null;
+
+  function renderAnalytics() {
+    const scope = $("ana-scope").value;
+    const filter = ($("ana-filter")?.value || "").trim().toLowerCase();
+    let data = aggregateParties(scope);
+    if (filter) data = data.filter(p => p.name.toLowerCase().includes(filter));
+
+    // Ordenação
+    const sorters = {
+      party: (a, b) => a.name.localeCompare(b.name, "pt-BR"),
+      gov: (a, b) => (a.govWon.length + a.govRunoff.length * .5) - (b.govWon.length + b.govRunoff.length * .5),
+      sen: (a, b) => a.senElected.length - b.senElected.length,
+      depfed: (a, b) => a.depfed - b.depfed,
+      depest: (a, b) => a.depest - b.depest,
+      votes: (a, b) => a.totalVotes - b.totalVotes,
+    };
+    const cmp = sorters[anaSort.col] || sorters.votes;
+    data.sort((a, b) => anaSort.dir === "desc" ? cmp(b, a) : cmp(a, b));
+
+    const maxV = Math.max(1, ...data.map(d => d.totalVotes));
+    const arrow = col => `<span class="sa">${anaSort.col === col ? (anaSort.dir === "desc" ? "\u25BC" : "\u25B2") : "\u25BC"}</span>`;
+    const attr = col => anaSort.col === col ? ` aria-sort="${anaSort.dir === "desc" ? "descending" : "ascending"}"` : "";
+    const isState = scope !== "brasil";
+
+    let h = `<table class="ana-table"><thead><tr>
+      <th data-sort="party"${attr("party")}>Partido ${arrow("party")}</th>
+      <th class="n" data-sort="gov"${attr("gov")}>Gov ${arrow("gov")}</th>
+      <th class="n" data-sort="sen"${attr("sen")}>Sen${isState ? "" : "*"} ${arrow("sen")}</th>
+      <th class="n" data-sort="depfed"${attr("depfed")}>Dep.Fed ${arrow("depfed")}</th>
+      <th class="n" data-sort="depest"${attr("depest")}>Dep.Est ${arrow("depest")}</th>
+      <th class="n" data-sort="votes"${attr("votes")}>Votos ${arrow("votes")}</th>
+    </tr></thead><tbody>`;
+
+    if (!data.length) {
+      h += `<tr><td colspan="6" class="ana-empty">Nenhum partido encontrado${filter ? " para esse filtro" : ""}.</td></tr>`;
+    } else {
+      data.forEach(p => {
+        const sel = p.name === anaPartyDetail;
+        const govLabel = p.govWon.length
+          ? `${p.govWon.length}` + (p.govRunoff.length ? ` + ${p.govRunoff.length}&#8239;2T` : "")
+          : p.govRunoff.length ? `${p.govRunoff.length}&#8239;2T` : "0";
+        const barW = (p.totalVotes / maxV * 80).toFixed(1);
+        h += `<tr class="${sel ? "hl" : ""}" data-party="${esc(p.name)}" style="cursor:pointer">
+          <td>${esc(p.name)}</td>
+          <td class="n">${govLabel}</td>
+          <td class="n">${p.senElected.length || "0"}</td>
+          <td class="n">${p.depfed ? fmtInt(p.depfed) : "0"}</td>
+          <td class="n">${p.depest ? fmtInt(p.depest) : "0"}</td>
+          <td class="n"><span class="ana-bar" style="width:${barW}px"></span>${fmtInt(p.totalVotes)}</td>
+        </tr>`;
+      });
+    }
+    h += `</tbody></table>`;
+    if (!isState) h += `<div class="more">*Sen: dados de senador disponíveis apenas para estados já consultados na aba Senador do painel.</div>`;
+    $("ana-body").innerHTML = h;
+
+    // Detalhe do partido
+    if (anaPartyDetail) {
+      const p = data.find(d => d.name === anaPartyDetail);
+      if (p) renderPartyDetail(p, scope); else $("ana-detail").innerHTML = "";
+    } else { $("ana-detail").innerHTML = ""; }
+    $("ana-updated").textContent = "Atualizado às " + new Date().toLocaleTimeString("pt-BR");
+  }
+
+  function renderPartyDetail(p, scope) {
+    const isState = scope !== "brasil";
+    let h = `<div class="ana-detail">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <h3 class="ana-detail-head">${esc(p.name)}</h3>
+        <button type="button" id="ana-close-detail" style="font-size:12px">Fechar</button>
+      </div>
+      <div class="cons-kpis" style="grid-template-columns:repeat(${isState ? 4 : 5},minmax(0,1fr))">
+        ${!isState ? `<div class="kpi"><span class="eyebrow">Pres. (votos)</span><b style="font-size:22px">${fmtInt(p.presVotes)}</b></div>` : ""}
+        <div class="kpi"><span class="eyebrow">Governadores</span><b>${p.govWon.length}</b>${p.govRunoff.length ? `<small>+ ${p.govRunoff.length} no 2T</small>` : ""}</div>
+        <div class="kpi"><span class="eyebrow">Senadores</span><b>${p.senElected.length}</b></div>
+        <div class="kpi"><span class="eyebrow">Dep. Federais</span><b>${fmtInt(p.depfed)}</b></div>
+        <div class="kpi"><span class="eyebrow">Dep. Estaduais</span><b>${fmtInt(p.depest)}</b></div>
+      </div>`;
+
+    if (p.govWon.length) {
+      h += `<div><div class="eyebrow" style="margin-bottom:6px">Governadores eleitos</div>
+        <div class="ana-chips">${p.govWon.map(g => `<span><b>${g.uf.toUpperCase()}</b> ${esc(g.nm)} · ${fmtPct(g.pct)}</span>`).join("")}</div></div>`;
+    }
+    if (p.govRunoff.length) {
+      h += `<div><div class="eyebrow" style="margin-bottom:6px">Governo no 2º turno</div>
+        <div class="ana-chips">${p.govRunoff.map(g => `<span><b>${g.uf.toUpperCase()}</b> ${esc(g.nm)}</span>`).join("")}</div></div>`;
+    }
+    if (p.govLead.length) {
+      h += `<div><div class="eyebrow" style="margin-bottom:6px">Liderando governo (em apuração)</div>
+        <div class="ana-chips">${p.govLead.map(g => `<span><b>${g.uf.toUpperCase()}</b> ${esc(g.nm)} · ${fmtPct(g.pct)}</span>`).join("")}</div></div>`;
+    }
+    if (p.senElected.length) {
+      h += `<div><div class="eyebrow" style="margin-bottom:6px">Senadores eleitos</div>
+        <div class="ana-chips">${p.senElected.map(s => `<span><b>${s.uf.toUpperCase()}</b> ${esc(s.nm)} · ${fmtInt(s.v)} votos</span>`).join("")}</div></div>`;
+    }
+
+    h += `<div><div class="eyebrow" style="margin-bottom:6px">Votos por cargo</div>
+      <div class="stats" style="grid-template-columns:repeat(${isState ? 4 : 5},minmax(0,1fr))">
+        ${!isState ? `<div class="stat"><label>Presidente</label><b style="font-size:16px">${fmtInt(p.presVotes)}</b></div>` : ""}
+        <div class="stat"><label>Governador</label><b style="font-size:16px">${fmtInt(p.govVotes)}</b></div>
+        <div class="stat"><label>Dep. Federal</label><b style="font-size:16px">${fmtInt(p.depfedVotes)}</b></div>
+        <div class="stat"><label>Dep. Estadual</label><b style="font-size:16px">${fmtInt(p.depestVotes)}</b></div>
+        <div class="stat"><label>Total</label><b style="font-size:16px">${fmtInt(p.totalVotes)}</b></div>
+      </div></div>`;
+
+    h += `</div>`;
+    $("ana-detail").innerHTML = h;
+  }
+
+  // Popula seletor de escopo
+  $("ana-scope").innerHTML = `<option value="brasil">Brasil (todas as UFs)</option>` +
+    UFS.map(u => `<option value="${u.id}">${esc(u.name)} (${u.id.toUpperCase()})</option>`).join("");
+
+  // Escopo: ao trocar, busca senador se for estado
+  $("ana-scope").addEventListener("change", async () => {
+    anaPartyDetail = null;
+    const scope = $("ana-scope").value;
+    if (scope !== "brasil" && !S[scope].sen) {
+      try { S[scope].sen = await fetchRace("sen", scope); } catch (e) { S[scope].sen = e; }
+    }
+    renderAnalytics();
+  });
+
+  // Filtro por partido (debounce)
+  let anaFT;
+  $("ana-filter").addEventListener("input", () => { clearTimeout(anaFT); anaFT = setTimeout(renderAnalytics, 200); });
+
+  // Sort e drill-down na tabela
+  $("ana-body").addEventListener("click", ev => {
+    const th = ev.target.closest("th[data-sort]");
+    if (th) {
+      const col = th.dataset.sort;
+      if (anaSort.col === col) anaSort.dir = anaSort.dir === "desc" ? "asc" : "desc";
+      else { anaSort.col = col; anaSort.dir = "desc"; }
+      renderAnalytics();
+      return;
+    }
+    const tr = ev.target.closest("tr[data-party]");
+    if (tr) {
+      anaPartyDetail = anaPartyDetail === tr.dataset.party ? null : tr.dataset.party;
+      renderAnalytics();
+    }
+  });
+
+  // Fechar detalhe
+  $("ana-detail").addEventListener("click", ev => {
+    if (ev.target.id === "ana-close-detail") { anaPartyDetail = null; renderAnalytics(); }
+  });
+
   // ---------- celebração ----------
   const queue = [];
   let showing = false;
@@ -1042,7 +1309,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
 
     clearTimeout(renderTimer); renderTimer = null;
     UFS.forEach(u => { const p = S[u.id].pres; if (p && !(p instanceof Error)) presState(p); });
-    renderPres(); renderKpis(); renderMap(); renderStates(); renderDetail();
+    renderPres(); renderKpis(); renderMap(); renderStates(); renderDetail(); renderAnalytics();
 
     const conf = collectConfirmed();
     const fresh = conf.filter(x => !confirmedKeys.has(x.key));
@@ -1155,7 +1422,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   }
 
   stSelect.value = selected;
-  renderPres(); renderKpis(); renderMap(); renderStates(); renderTabs(); buildDetail();
+  renderPres(); renderKpis(); renderMap(); renderStates(); renderTabs(); buildDetail(); renderAnalytics();
   if (snapT) renderConsolidated(collectConfirmed());
   cycle();
   schedule();
