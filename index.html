@@ -918,15 +918,18 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     $("t2-gov-stats").innerHTML = gov && !(gov instanceof Error)
       ? `<div class="eyebrow" style="margin-bottom:12px">Estatísticas · ${esc(UFNAME[uf] || uf.toUpperCase())}</div>${stats(gov)}`
       : `<div class="eyebrow" style="margin-bottom:12px">Estatísticas</div>${waiting(gov instanceof Error ? gov.message : "")}`;
-    const times = t2Jobs().map(([k, id]) => R2[k + ":" + id]).filter(n => n && !(n instanceof Error)).map(n => parseTse(n.when)).filter(Boolean);
+    // Usa o mesmo campo oficial de data/hora do TSE que alimenta o status do 1º turno.
+    // Não mistura o horário local da consulta com o horário informado pela fonte.
+    const times = t2Jobs().map(([k, id]) => R2[k + ":" + id])
+      .filter(n => n && !(n instanceof Error))
+      .map(n => parseTse(n.when)).filter(Boolean);
     const latestT2 = times.length ? new Date(Math.max(...times)) : null;
-    const checkedT2 = fmtHM(new Date());
     const staleT2 = latestT2 && Date.now() - latestT2.getTime() > 10 * 60 * 1000;
     $("t2-updated").textContent = !latestT2
-      ? `Aguardando dados oficiais do TSE · consulta às ${checkedT2}`
+      ? "Aguardando horário oficial do TSE"
       : staleT2
-        ? `TSE sem atualizar desde ${fmtHM(latestT2)} · consultado às ${checkedT2}`
-        : `Dados do TSE de ${fmtHM(latestT2)} · consultado às ${checkedT2}`;
+        ? `TSE sem atualizar desde ${fmtHM(latestT2)}`
+        : `Dados do TSE de ${fmtHM(latestT2)}`;
   }
   function setTurn(mode) {
     secondTurnMode = mode;
