@@ -919,7 +919,14 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       ? `<div class="eyebrow" style="margin-bottom:12px">Estatísticas · ${esc(UFNAME[uf] || uf.toUpperCase())}</div>${stats(gov)}`
       : `<div class="eyebrow" style="margin-bottom:12px">Estatísticas</div>${waiting(gov instanceof Error ? gov.message : "")}`;
     const times = t2Jobs().map(([k, id]) => R2[k + ":" + id]).filter(n => n && !(n instanceof Error)).map(n => parseTse(n.when)).filter(Boolean);
-    $("t2-updated").textContent = times.length ? `Dados do TSE · ${fmtHM(new Date(Math.max(...times)))}` : "Aguardando dados oficiais do TSE";
+    const latestT2 = times.length ? new Date(Math.max(...times)) : null;
+    const checkedT2 = fmtHM(new Date());
+    const staleT2 = latestT2 && Date.now() - latestT2.getTime() > 10 * 60 * 1000;
+    $("t2-updated").textContent = !latestT2
+      ? `Aguardando dados oficiais do TSE · consulta às ${checkedT2}`
+      : staleT2
+        ? `TSE sem atualizar desde ${fmtHM(latestT2)} · consultado às ${checkedT2}`
+        : `Dados do TSE de ${fmtHM(latestT2)} · consultado às ${checkedT2}`;
   }
   function setTurn(mode) {
     secondTurnMode = mode;
