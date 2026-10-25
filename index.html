@@ -732,7 +732,12 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       const d = secondTurnMode
         ? mapRace(kind, u.id)
         : (layer === "gov" ? mapRace("gov", u.id) : layer === "sen" ? mapRace("sen", u.id) : mapRace("pres", u.id));
-      pctEls[u.id].textContent = d ? pctText(d.pst) : "–";
+      const leader = d && d.cands ? d.cands.find(c => c.v > 0) : null;
+      // No 2º turno, o número no mapa é a porcentagem de votos do líder;
+      // no 1º turno, continua sendo o percentual de urnas totalizadas.
+      pctEls[u.id].textContent = !d ? "–" : secondTurnMode
+        ? (leader ? pctText(leader.p) : "—")
+        : pctText(d.pst);
       const r = secondTurnMode ? null : (layer === "gov" || layer === "sen" ? S[u.id][layer] : null);
       const ok = r && !(r instanceof Error);
       ufEls[u.id].textContent = u.id.toUpperCase();
@@ -764,7 +769,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       const title = kind === "gov" ? "Governador · 2º turno" : "Presidente · 2º turno";
       tip.innerHTML = `<b>${esc(UFNAME[uf])}</b>
         <div class="row"><span>${title}</span><span>${d ? fmtPct(d.pst) : "—"} das urnas</span></div>
-        ${lead && lead.v ? `<div class="tip-c">${face(kind, uf, lead)}<span>${swatch(lead)}${esc(lead.nm)} <small style="font-weight:400">${esc(partyName(lead.cc))} · ${fmtPct(lead.p)}</small></span></div>` : `<div class="more">${kind === "gov" && !T2.govUFs.includes(uf) ? "Não há 2º turno para governador neste estado." : d ? "Aguardando votos válidos" : "Dados do 2º turno ainda não disponíveis para este estado."}</div>`}`;
+        ${d && d.cands.filter(c => c.v > 0).length ? d.cands.filter(c => c.v > 0).slice(0, 2).map(c => `<div class="tip-c">${face(kind, uf, c)}<span>${swatch(c)}${esc(c.nm)} <small style="font-weight:400">${esc(partyName(c.cc))} · ${fmtPct(c.p)}</small></span></div>`).join("") : `<div class="more">${kind === "gov" && !T2.govUFs.includes(uf) ? "Não há 2º turno para governador neste estado." : d ? "Aguardando votos válidos" : "Dados do 2º turno ainda não disponíveis para este estado."}</div>`}`;
       tip.hidden = false;
       const box = $("map-wrap").getBoundingClientRect();
       let x = ev.clientX - box.left + 14, y = ev.clientY - box.top + 14;
