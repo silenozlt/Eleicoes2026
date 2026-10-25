@@ -698,45 +698,78 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   const pctText = p => p >= 100 ? "100%" : p >= 10 ? Math.floor(p) + "%" : (Math.floor(p * 10) / 10).toLocaleString("pt-BR") + "%";
 
   const pstBin = p => p <= 0 ? 0 : p < 25 ? 1 : p < 50 ? 2 : p < 75 ? 3 : p < 100 ? 4 : 5;
+  function mapRace(kind, uf) {
+    if (secondTurnMode) {
+      const d = R2[kind + ":" + uf];
+      return d && !(d instanceof Error) ? d : null;
+    }
+    const d = S[uf]?.[kind];
+    return d && !(d instanceof Error) ? d : null;
+  }
+  function mapLeader(kind, uf) {
+    const d = mapRace(kind, uf);
+    return d && d.cands && d.cands[0]?.v ? d.cands[0] : null;
+  }
   function fillFor(uf) {
-    if (layer === "pst") {
+    if (!secondTurnMode && layer === "pst") {
       const d = [S[uf].pres, S[uf].gov].find(x => x && !(x instanceof Error));
       return d ? `var(--m${pstBin(d.pst)})` : "var(--m0)";
     }
-    const lead = leaderOf(layer, uf);
+    const kind = layer === "gov" ? "gov" : "pres";
+    const lead = mapLeader(kind, uf);
     return lead ? partyColor(lead.cc) : "var(--m0)";
   }
   function renderMap() {
+    const kind = layer === "gov" ? "gov" : "pres";
     UFS.forEach(u => {
       paths[u.id].style.fill = fillFor(u.id);
       paths[u.id].classList.toggle("sel", u.id === selected);
     });
-    svg.insertBefore(paths[selected], labelLayer); // traz o selecionado para cima das bordas
+    svg.insertBefore(paths[selected], labelLayer);
     UFS.forEach(u => {
-      const d = [S[u.id].pres, S[u.id].gov].find(x => x && !(x instanceof Error));
+      const d = secondTurnMode
+        ? mapRace(kind, u.id)
+        : (layer === "gov" ? mapRace("gov", u.id) : layer === "sen" ? mapRace("sen", u.id) : mapRace("pres", u.id));
       pctEls[u.id].textContent = d ? pctText(d.pst) : "–";
-      // ✓ = eleito no estado; 2T = governo vai ao 2º turno
-      const r = layer === "gov" || layer === "sen" ? S[u.id][layer] : null;
+      const r = secondTurnMode ? null : (layer === "gov" || layer === "sen" ? S[u.id][layer] : null);
       const ok = r && !(r instanceof Error);
       ufEls[u.id].textContent = u.id.toUpperCase();
       const st = ok ? r.sit.cls : "";
       badgeEls[u.id].setAttribute("class", "mb" + (st === "done" ? " e" : st === "runoff" ? " r" : ""));
     });
-    if (layer === "pst") {
+    if (!secondTurnMode && layer === "pst") {
       $("legend").innerHTML = [["m0", "sem dados"], ["m1", "até 25%"], ["m2", "25–50%"], ["m3", "50–75%"], ["m4", "75–99%"], ["m5", "100%"]].map(([c, t]) => `<span><i style="background:var(--${c})"></i>${t}</span>`).join("");
       return;
     }
-    // Legenda: partidos que lideram em algum estado, com quantos estados
     const count = {}, sample = {};
-    UFS.forEach(u => { const l = leaderOf(layer, u.id); if (l) { const p = partyName(l.cc); count[p] = (count[p] || 0) + 1; sample[p] = l; } });
+    UFS.forEach(u => {
+      const l = mapLeader(kind, u.id);
+      if (l) { const p = partyName(l.cc); count[p] = (count[p] || 0) + 1; sample[p] = l; }
+    });
     const items = Object.keys(count).sort((a, b) => count[b] - count[a]).map(p =>
-      `<span>${swatch(sample[p], 12)}${esc(p)}${layer === "pres" ? " (" + esc(sample[p].nm) + ")" : ""} · ${count[p]}</span>`);
-    const note = layer === "pres" ? "" : `<span>${OK_IC} eleito</span>${layer === "gov" ? `<span>${T2_IC} 2º turno</span>` : ""}`;
+      `<span>${swatch(sample[p], 12)}${esc(p)}${kind === "pres" ? " (" + esc(sample[p].nm) + ")" : ""} · ${count[p]}</span>`);
+    const note = secondTurnMode ? `<span>Mapa do 2º turno · percentuais por estado</span>` :
+      (layer === "pres" ? "" : `<span>${OK_IC} eleito</span>${layer === "gov" ? `<span>${T2_IC} 2º turno</span>` : ""}`);
     $("legend").innerHTML = items.join("") + `<span><i style="background:var(--m0)"></i>sem dados</span>` + note;
   }
 
   const tip = $("tip");
   function showTip(uf, ev) {
+    if (secondTurnMode) {
+      const kind = layer === "gov" ? "gov" : "pres";
+      const d = mapRace(kind, uf);
+      const lead = d && d.cands ? d.cands[0] : null;
+      const title = kind === "gov" ? "Governador · 2º turno" : "Presidente · 2º turno";
+      tip.innerHTML = `<b>${esc(UFNAME[uf])}</b>
+        <div class="row"><span>${title}</span><span>${d ? fmtPct(d.pst) : "—"} das urnas</span></div>
+        ${lead && lead.v ? `<div class="tip-c">${face(kind, uf, lead)}<span>${swatch(lead)}${esc(lead.nm)} <small style="font-weight:400">${esc(partyName(lead.cc))} · ${fmtPct(lead.p)}</small></span></div>` : `<div class="more">${d ? "Aguardando votos válidos" : "Dados do 2º turno ainda não disponíveis para este estado."}</div>`}`;
+      tip.hidden = false;
+      const box = $("map-wrap").getBoundingClientRect();
+      let x = ev.clientX - box.left + 14, y = ev.clientY - box.top + 14;
+      if (x + 240 > box.width) x = ev.clientX - box.left - 250;
+      tip.style.left = Math.max(4, x) + "px"; tip.style.top = y + "px";
+      return;
+    }
     const g = S[uf].gov;
     const lead = g && !(g instanceof Error) ? g.cands[0] : null;
     tip.innerHTML = `<b>${esc(UFNAME[uf])}</b>
@@ -759,7 +792,12 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   $("layer-gov").addEventListener("click", () => setLayer("gov"));
   $("layer-pres").addEventListener("click", () => setLayer("pres"));
   $("layer-sen").addEventListener("click", () => setLayer("sen"));
-  function setLayer(l) { layer = l; ["pst", "pres", "gov", "sen"].forEach(x => $("layer-" + x).setAttribute("aria-pressed", l === x)); renderMap(); }
+  function setLayer(l) {
+    if (secondTurnMode && l !== "pres" && l !== "gov") return;
+    layer = l;
+    ["pst", "pres", "gov", "sen"].forEach(x => $("layer-" + x).setAttribute("aria-pressed", l === x));
+    renderMap();
+  }
   function setList(k) { listKind = k; ["pres", "gov", "sen"].forEach(x => $("list-" + x).setAttribute("aria-pressed", k === x)); renderStates(); }
   $("list-sen").addEventListener("click", () => setList("sen"));
   $("list-pres").addEventListener("click", () => setList("pres"));
@@ -799,17 +837,23 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     const el = T2[kind].el, cargo = kind === "pres" ? "0001" : "0003";
     return `${BASE}/${el}/dados/${uf}/${uf}-c${cargo}-e${el.padStart(6, "0")}-u.json`;
   };
+  // Cards: presidente nacional + estados com disputa de governador.
   const t2Jobs = () => [["pres", "br"], ...T2.govUFs.map(uf => ["gov", uf])];
+  // O mapa precisa dos resultados presidenciais do 2º turno separados por estado.
+  const t2MapJobs = () => [["pres", "br"], ...UFS.map(u => ["pres", u.id]), ...T2.govUFs.map(uf => ["gov", uf])];
   let secondTurnMode = false;
   const t2Loaded = new Set();;
   // Mesma rota das demais consultas (timeout, nova tentativa, pausa em 429); no ?demo usa dados fictícios
   function loadT2() {
-    const jobs = t2Jobs().filter(([k, uf]) => !R2[k + ":" + uf]?.final && !t2Loaded.has(k + ":" + uf));
+    const jobs = t2MapJobs().filter(([k, uf]) => !R2[k + ":" + uf]?.final && !t2Loaded.has(k + ":" + uf));
     return Promise.all(jobs.map(async ([k, uf]) => {
       const key = k + ":" + uf, old = R2[key]; t2Loaded.add(key);
       try { R2[key] = await fetchRaceRaw(k, uf, t2Url(k, uf)); }
       catch (e) { R2[key] = old && !(old instanceof Error) ? old : e; t2Loaded.delete(key); }
-    })).then(() => { if (t2On) renderT2(); if (secondTurnMode) renderSecondTurn(); });
+    })).then(() => {
+      if (t2On) renderT2();
+      if (secondTurnMode) { renderSecondTurn(); renderMap(); }
+    });
   }
   function t2Card(k, uf) {
     const n = R2[k + ":" + uf];
@@ -841,6 +885,12 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     $("second-turn-view").hidden = !mode;
     $("turn1-button").setAttribute("aria-pressed", String(!mode));
     $("turn2-button").setAttribute("aria-pressed", String(mode));
+    $("layer-pst").hidden = mode;
+    $("layer-sen").hidden = mode;
+    if (mode && layer !== "gov") layer = "pres";
+    ["pst", "pres", "gov", "sen"].forEach(x => $("layer-" + x).setAttribute("aria-pressed", layer === x));
+    $("tip").hidden = true;
+    renderMap();
     if (mode) { loadT2(); renderSecondTurn(); }
   }
   $("turn1-button").addEventListener("click", () => setTurn(false));
@@ -1530,6 +1580,3 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
 </script>
 </body>
 </html>
-
-
-
