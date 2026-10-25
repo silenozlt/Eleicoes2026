@@ -1546,7 +1546,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     } else {
       statusText.textContent = !got ? `Aguardando divulgação · checado às ${now}`
         : !tse ? `Atualizado às ${now}${errTxt}`
-        : ended ? `Apuração encerrada · dados do TSE de ${hhmm(tse)}`
+        : ended ? `Última busca: ${now} · Último envio do TSE: ${hhmm(tse)}`
         : stale ? `TSE sem atualizar desde ${hhmm(tse)} · checado às ${now}${errTxt}`
         : `Dados do TSE de ${hhmm(tse)} · checado às ${now}${errTxt}`;
     }
