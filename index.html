@@ -845,18 +845,29 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   const t2MapJobs = () => [["pres", "br"], ...UFS.map(u => ["pres", u.id]), ...T2.govUFs.map(uf => ["gov", uf])];
   let secondTurnMode = false;
   const t2Loaded = new Set();;
-  // Mesma rota das demais consultas (timeout, nova tentativa, pausa em 429); no ?demo usa dados fictícios
+  // No segundo turno, falha fechada: nunca reaproveitar resultados antigos nem aceitar
+  // arquivo que contenha votos para mais de dois candidatos (sinal de dados do 1º turno).
+  async function fetchT2Race(k, uf) {
+    const n = await fetchRaceRaw(k, uf, t2Url(k, uf));
+    if (!n) return null;
+    const candidatesWithVotes = n.cands.filter(c => c.v > 0);
+    if (candidatesWithVotes.length > 2) {
+      throw new Error("Dados recusados: o arquivo consultado contém mais de dois candidatos com votos; não será exibido como 2º turno.");
+    }
+    return n;
+  }
   function loadT2() {
     const jobs = t2MapJobs().filter(([k, uf]) => !R2[k + ":" + uf]?.final && !t2Loaded.has(k + ":" + uf));
     return Promise.all(jobs.map(async ([k, uf]) => {
-      const key = k + ":" + uf, old = R2[key]; t2Loaded.add(key);
-      try { R2[key] = await fetchRaceRaw(k, uf, t2Url(k, uf)); }
-      catch (e) { R2[key] = old && !(old instanceof Error) ? old : e; t2Loaded.delete(key); }
+      const key = k + ":" + uf; t2Loaded.add(key);
+      try { R2[key] = await fetchT2Race(k, uf); }
+      catch (e) { R2[key] = e; t2Loaded.delete(key); }
     })).then(() => {
       if (t2On) renderT2();
       if (secondTurnMode) { renderSecondTurn(); renderMap(); }
     });
   }
+
   function t2Card(k, uf) {
     const n = R2[k + ":" + uf];
     const title = k === "pres" ? "Presidente · Brasil" : `Governador · ${UFNAME[uf] || uf.toUpperCase()}`;
