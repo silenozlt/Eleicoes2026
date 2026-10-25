@@ -901,7 +901,6 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       <div class="kpi"><span class="eyebrow">Abstenção · Brasil</span><b>${validPres ? fmtPct(validPres.pa) : "—"}</b><small>${validPres ? fmtInt(validPres.a) + " eleitores" : "aguardando o TSE"}</small></div>
     `;
     const sel = $("t2-uf-select");
-    const sel = $("t2-uf-select");
     if (!sel.options.length) {
       sel.innerHTML = T2.govUFs.map(uf => `<option value="${uf}">${esc(UFNAME[uf] || uf.toUpperCase())}</option>`).join("");
       sel.value = T2.govUFs.includes(selected) ? selected : (T2.govUFs[0] || "");
