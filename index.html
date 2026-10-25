@@ -76,6 +76,7 @@ h1 { font: 800 clamp(38px, 6vw, 64px)/.9 var(--font-display); margin: 4px 0 0; t
 h1 span { color: var(--ink); }
 h2.sec { font: 800 30px/1 var(--font-display); margin: 0; text-transform: uppercase; }
 .sec-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 8px 16px; }
+.t2-time-status { display: block; flex: 1 0 100%; width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: 600 12px/1.5 var(--font-mono); overflow-wrap: anywhere; }
 
 header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 14px 24px; }
 /* visor da urna */
@@ -337,7 +338,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     <button type="button" id="turn2-button" aria-pressed="false">2º turno</button>
   </nav>
   <section id="second-turn-view" hidden aria-label="Apuração do segundo turno">
-    <div class="sec-head"><h2 class="sec">2º turno · apuração</h2><span class="eyebrow" id="t2-updated">Dados oficiais do TSE</span></div>
+    <div class="sec-head"><h2 class="sec">2º turno · apuração</h2><div class="t2-time-status" id="t2-updated">Última busca: aguardando consulta · Último envio do TSE: aguardando dados</div></div>
     <section class="national" aria-label="Presidente e indicadores do segundo turno">
       <div class="panel" id="t2-national"></div>
       <div class="panel kpis" id="t2-kpis" aria-label="Indicadores de apuração do segundo turno"></div>
