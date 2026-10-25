@@ -343,13 +343,14 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       <div id="t2-governor"></div>
     </section>
   </section>
-  <div id="first-turn-content">
-
+  <div id="first-turn-top">
   <section class="national">
     <div class="panel" id="pres"></div>
     <div class="panel kpis" id="kpis"></div>
   </section>
+  </div>
 
+  <!-- Mapa compartilhado entre os dois turnos: preserva o mesmo mapa interativo do 1º turno. -->
   <section class="geo">
     <div class="panel map-wrap" id="map-wrap">
       <div class="map-tools">
@@ -376,6 +377,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     </div>
   </section>
 
+  <div id="first-turn-content">
   <section class="panel" style="display:grid;gap:14px">
     <div class="sec-head"><h2 class="sec">Por estado</h2><div class="seg" role="group" aria-label="Cargo da lista"><button type="button" id="list-pres" aria-pressed="false">Presidente</button><button type="button" id="list-gov" aria-pressed="true">Governador</button><button type="button" id="list-sen" aria-pressed="false">Senador</button></div></div>
     <div class="states" id="states"></div>
@@ -833,6 +835,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   }
   function setTurn(mode) {
     secondTurnMode = mode;
+    $("first-turn-top").hidden = mode;
     $("first-turn-content").hidden = mode;
     $("second-turn-view").hidden = !mode;
     $("turn1-button").setAttribute("aria-pressed", String(!mode));
