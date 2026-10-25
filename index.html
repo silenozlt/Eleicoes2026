@@ -105,8 +105,6 @@ button:hover { border-color: var(--fg); }
 /* Presidente + números */
 .national { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; }
 .kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 16px; align-content: start; }
-.t2-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-@media (max-width: 760px) { .t2-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .kpi { display: grid; gap: 2px; }
 .kpi b { font: 800 46px/1 var(--font-display); font-variant-numeric: tabular-nums; }
 .kpi b .of { font-size: 26px; color: var(--muted); }
@@ -340,8 +338,10 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   </nav>
   <section id="second-turn-view" hidden aria-label="Apuração do segundo turno">
     <div class="sec-head"><h2 class="sec">2º turno · apuração</h2><span class="eyebrow" id="t2-updated">Dados oficiais do TSE</span></div>
-    <div class="t2-grid" id="t2-national"></div>
-    <section class="panel kpis t2-kpis" id="t2-kpis" aria-label="Indicadores de apuração do segundo turno"></section>
+    <section class="national" aria-label="Presidente e indicadores do segundo turno">
+      <div class="panel" id="t2-national"></div>
+      <div class="panel kpis" id="t2-kpis" aria-label="Indicadores de apuração do segundo turno"></div>
+    </section>
     <section class="panel" style="display:grid;gap:12px">
       <div class="sec-head"><h2 class="sec">Governadores</h2><label class="eyebrow" for="t2-uf-select">Estado</label></div>
       <select id="t2-uf-select" aria-label="Selecionar estado para governador no segundo turno"></select>
