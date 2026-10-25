@@ -1540,11 +1540,17 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     const stale = tse && !ended && Date.now() - tse.getTime() > 10 * 60 * 1000;
     $("lcd").classList.toggle("stale", !!stale);
     const errTxt = errors ? ` · ${errors} consulta(s) com erro` : "";
-    statusText.textContent = !got ? `Aguardando divulgação · checado às ${now}`
-      : !tse ? `Atualizado às ${now}${errTxt}`
-      : ended ? `Apuração encerrada · dados do TSE de ${hhmm(tse)}`
-      : stale ? `TSE sem atualizar desde ${hhmm(tse)} · checado às ${now}${errTxt}`
-      : `Dados do TSE de ${hhmm(tse)} · checado às ${now}${errTxt}`;
+    if (secondTurnMode) {
+      // O status nacional do 1º turno não deve aparecer como se fosse a apuração do 2º turno.
+      $("lcd").classList.remove("stale");
+      statusText.textContent = "2º turno · horário dos dados nos painéis abaixo";
+    } else {
+      statusText.textContent = !got ? `Aguardando divulgação · checado às ${now}`
+        : !tse ? `Atualizado às ${now}${errTxt}`
+        : ended ? `Apuração encerrada · dados do TSE de ${hhmm(tse)}`
+        : stale ? `TSE sem atualizar desde ${hhmm(tse)} · checado às ${now}${errTxt}`
+        : `Dados do TSE de ${hhmm(tse)} · checado às ${now}${errTxt}`;
+    }
     lastDone = Date.now();
     busy = false;
   }
