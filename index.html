@@ -330,6 +330,20 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     </div>
   </header>
   <div class="demo-banner" id="demo-banner" hidden>MODO DEMONSTRAÇÃO: nomes e números fictícios, com a apuração acelerada para testar o mapa e as animações. Tire <code>?demo</code> do endereço para ver os dados reais.</div>
+  <nav class="turn-switch" aria-label="Turno da eleição">
+    <button type="button" id="turn1-button" aria-pressed="true">1º turno</button>
+    <button type="button" id="turn2-button" aria-pressed="false">2º turno</button>
+  </nav>
+  <section id="second-turn-view" hidden aria-label="Apuração do segundo turno">
+    <div class="sec-head"><h2 class="sec">2º turno · apuração</h2><span class="eyebrow" id="t2-updated">Dados oficiais do TSE</span></div>
+    <div class="t2-grid" id="t2-national"></div>
+    <section class="panel" style="display:grid;gap:12px">
+      <div class="sec-head"><h2 class="sec">Governadores</h2><label class="eyebrow" for="t2-uf-select">Estado</label></div>
+      <select id="t2-uf-select" aria-label="Selecionar estado para governador no segundo turno"></select>
+      <div id="t2-governor"></div>
+    </section>
+  </section>
+  <div id="first-turn-content">
 
   <section class="national">
     <div class="panel" id="pres"></div>
@@ -388,6 +402,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     <div id="ana-detail"></div>
   </section>
 
+  </div>
   <footer class="foot">
     <span>Fonte: Tribunal Superior Eleitoral, divulgação oficial de resultados</span>
     <a href="https://resultados.tse.jus.br/oficial/app/index.html" target="_blank" rel="noopener">resultados.tse.jus.br</a>
@@ -782,20 +797,50 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     const el = T2[kind].el, cargo = kind === "pres" ? "0001" : "0003";
     return `${BASE}/${el}/dados/${uf}/${uf}-c${cargo}-e${el.padStart(6, "0")}-u.json`;
   };
-  const t2Jobs = () => {
-    const jobs = [["pres", "br"], ["pres", selected]];
-    if (T2.govUFs.includes(selected)) jobs.push(["gov", selected]);
-    return jobs;
-  };
+  const t2Jobs = () => [["pres", "br"], ...T2.govUFs.map(uf => ["gov", uf])];
+  let secondTurnMode = false;
+  const t2Loaded = new Set();;
   // Mesma rota das demais consultas (timeout, nova tentativa, pausa em 429); no ?demo usa dados fictícios
   function loadT2() {
-    const jobs = t2Jobs().filter(([k, uf]) => !R2[k + ":" + uf]?.final);
+    const jobs = t2Jobs().filter(([k, uf]) => !R2[k + ":" + uf]?.final && !t2Loaded.has(k + ":" + uf));
     return Promise.all(jobs.map(async ([k, uf]) => {
-      const key = k + ":" + uf, old = R2[key];
+      const key = k + ":" + uf, old = R2[key]; t2Loaded.add(key);
       try { R2[key] = await fetchRaceRaw(k, uf, t2Url(k, uf)); }
-      catch (e) { R2[key] = old && !(old instanceof Error) ? old : e; }
-    })).then(() => { if (t2On) renderT2(); });
+      catch (e) { R2[key] = old && !(old instanceof Error) ? old : e; t2Loaded.delete(key); }
+    })).then(() => { if (t2On) renderT2(); if (secondTurnMode) renderSecondTurn(); });
   }
+  function t2Card(k, uf) {
+    const n = R2[k + ":" + uf];
+    const title = k === "pres" ? "Presidente · Brasil" : `Governador · ${UFNAME[uf] || uf.toUpperCase()}`;
+    let body = n === undefined ? `<div class="empty"><strong>Carregando dados do TSE…</strong></div>`
+      : n instanceof Error ? waiting(n.message)
+      : n === null ? waiting("") + `<div class="more">Dados do segundo turno ainda não publicados neste endereço.</div>`
+      : `<div class="eyebrow">${fmtPct(n.pst)} das urnas apuradas</div>${progress(n)}${candList(k, uf, n, 2)}${stats(n)}<div class="more">Dados do TSE de ${esc(n.when)}</div>`;
+    return `<article class="t2-card"><h3>${esc(title)}</h3><div class="t2-sub">${k === "pres" ? "Disputa presidencial" : "Disputa estadual"}</div>${body}</article>`;
+  }
+  function renderSecondTurn() {
+    $("t2-national").innerHTML = t2Card("pres", "br");
+    const sel = $("t2-uf-select");
+    if (!sel.options.length) {
+      sel.innerHTML = T2.govUFs.map(uf => `<option value="${uf}">${esc(UFNAME[uf] || uf.toUpperCase())}</option>`).join("");
+      sel.value = T2.govUFs.includes(selected) ? selected : (T2.govUFs[0] || "");
+      sel.addEventListener("change", renderSecondTurn);
+    }
+    const uf = sel.value;
+    $("t2-governor").innerHTML = T2.govUFs.includes(uf) ? t2Card("gov", uf) : `<div class="empty">Não há disputa de governador cadastrada para esta UF.</div>`;
+    const times = t2Jobs().map(([k, id]) => R2[k + ":" + id]).filter(n => n && !(n instanceof Error)).map(n => parseTse(n.when)).filter(Boolean);
+    $("t2-updated").textContent = times.length ? `Dados do TSE · ${fmtHM(new Date(Math.max(...times)))}` : "Aguardando dados oficiais do TSE";
+  }
+  function setTurn(mode) {
+    secondTurnMode = mode;
+    $("first-turn-content").hidden = mode;
+    $("second-turn-view").hidden = !mode;
+    $("turn1-button").setAttribute("aria-pressed", String(!mode));
+    $("turn2-button").setAttribute("aria-pressed", String(mode));
+    if (mode) { loadT2(); renderSecondTurn(); }
+  }
+  $("turn1-button").addEventListener("click", () => setTurn(false));
+  $("turn2-button").addEventListener("click", () => setTurn(true));
   function t2Block(k, uf) {
     const n = R2[k + ":" + uf];
     if (n === undefined) return `<div class="empty"><strong>Carregando…</strong></div>`;
@@ -1305,7 +1350,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     const fetchRace = (k, uf) => fetchRaceRaw(k, uf).then(n => my === gen ? n : new Promise(() => {}), e => my === gen ? Promise.reject(e) : new Promise(() => {}));
     tseLimited = false;
     if (DEMO) demoTick++;
-    if (t2On) loadT2();
+    if (t2On || secondTurnMode) loadT2();
     let errors = 0, got = 0, doneCount = 0;
     // Em caso de erro, mantém o último resultado bom em vez de apagar o estado da tela
     const keep = (old, e) => old && !(old instanceof Error) ? old : e;
@@ -1473,7 +1518,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   }
 
   stSelect.value = selected;
-  renderPres(); renderKpis(); renderMap(); renderStates(); renderTabs(); buildDetail(); renderAnalytics();
+  renderPres(); renderKpis(); renderMap(); renderStates(); renderTabs(); buildDetail(); renderAnalytics(); renderSecondTurn();
   if (snapT) renderConsolidated(collectConfirmed());
   cycle();
   schedule();
