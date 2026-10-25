@@ -874,6 +874,9 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       try { R2[key] = await fetchT2Race(k, uf); }
       catch (e) { R2[key] = e; t2Loaded.delete(key); }
     })).then(() => {
+      // Libera os resultados concluídos para que o próximo ciclo/botão "Atualizar agora"
+      // consulte novamente o TSE. Durante a consulta, t2Loaded evita chamadas duplicadas.
+      jobs.forEach(([k, uf]) => t2Loaded.delete(k + ":" + uf));
       if (t2On) renderT2();
       if (secondTurnMode) { renderSecondTurn(); renderMap(); }
     });
