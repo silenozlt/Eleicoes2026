@@ -112,6 +112,8 @@ button:hover { border-color: var(--fg); }
 
 /* Mapa + painel */
 .geo { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.geo.second-turn { grid-template-columns: minmax(0, 1fr); }
+.geo.second-turn #state-panel { display: none; }
 .map-wrap { position: relative; }
 .map-tools { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
 .seg { display: inline-flex; flex-wrap: wrap; max-width: 100%; background: var(--track); border-radius: 4px; padding: 3px; gap: 3px; }
@@ -762,7 +764,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       const title = kind === "gov" ? "Governador · 2º turno" : "Presidente · 2º turno";
       tip.innerHTML = `<b>${esc(UFNAME[uf])}</b>
         <div class="row"><span>${title}</span><span>${d ? fmtPct(d.pst) : "—"} das urnas</span></div>
-        ${lead && lead.v ? `<div class="tip-c">${face(kind, uf, lead)}<span>${swatch(lead)}${esc(lead.nm)} <small style="font-weight:400">${esc(partyName(lead.cc))} · ${fmtPct(lead.p)}</small></span></div>` : `<div class="more">${d ? "Aguardando votos válidos" : "Dados do 2º turno ainda não disponíveis para este estado."}</div>`}`;
+        ${lead && lead.v ? `<div class="tip-c">${face(kind, uf, lead)}<span>${swatch(lead)}${esc(lead.nm)} <small style="font-weight:400">${esc(partyName(lead.cc))} · ${fmtPct(lead.p)}</small></span></div>` : `<div class="more">${kind === "gov" && !T2.govUFs.includes(uf) ? "Não há 2º turno para governador neste estado." : d ? "Aguardando votos válidos" : "Dados do 2º turno ainda não disponíveis para este estado."}</div>`}`;
       tip.hidden = false;
       const box = $("map-wrap").getBoundingClientRect();
       let x = ev.clientX - box.left + 14, y = ev.clientY - box.top + 14;
@@ -829,7 +831,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   const T2 = {
     pres: { el: QS.get("t2pres") || "6258" },
     gov:  { el: QS.get("t2gov") || "6260" },
-    govUFs: ["ac", "am", "df", "es", "rj", "rn", "to"],
+    govUFs: ["ac", "am", "df", "es", "rn", "to"],
   };
   let t2On = false;
   const R2 = {}; // "pres:br" | "pres:mg" | "gov:rj" -> undefined (carregando) | null (não publicado) | Error | dados
@@ -879,6 +881,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   }
   function setTurn(mode) {
     secondTurnMode = mode;
+    document.querySelector(".geo").classList.toggle("second-turn", mode);
     $("map-title").textContent = mode ? "Brasil · 2º turno" : "Brasil · 1º turno";
     $("first-turn-top").hidden = mode;
     $("first-turn-content").hidden = mode;
