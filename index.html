@@ -314,7 +314,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
 <div class="wrap">
   <header class="top">
     <div>
-      <div class="eyebrow">Eleições Gerais 2026 · 1º turno · domingo, 4 de outubro</div>
+      <div class="eyebrow">Eleições Gerais 2026 · 1º turno 4/10 · 2º turno 25/10</div>
       <h1>Apuração <span>ao vivo</span></h1>
     </div>
     <div class="status">
@@ -492,7 +492,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   }
 
   let tseLimited = false;
-  async function fetchRaceRaw(k, uf) {
+  async function fetchRaceRaw(k, uf, url) {
     if (DEMO) return normalize(k, demoData(k, uf));
     // Sem parâmetro na URL: o TSE responde pelo cache da CDN dele (renovado a cada ~25 s), bem mais rápido.
     // "no-cache" faz o navegador revalidar a cada ciclo em vez de reaproveitar a cópia local.
@@ -501,7 +501,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     for (let i = 0; i < 2; i++) {
       const ctl = new AbortController();
       const timer = setTimeout(() => ctl.abort(), 15000);
-      try { res = await fetch(fileUrl(k, uf), { cache: "no-cache", signal: ctl.signal }); break; }
+      try { res = await fetch(url || fileUrl(k, uf), { cache: "no-cache", signal: ctl.signal }); break; }
       catch (e) { if (i === 1) throw new Error(e.name === "AbortError" ? "TSE demorou a responder" : e.message); }
       finally { clearTimeout(timer); }
     }
@@ -767,13 +767,62 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   $("states").addEventListener("click", ev => { const b = ev.target.closest("[data-uf]"); if (b) { select(b.dataset.uf); $("state-panel").scrollIntoView({ behavior: "smooth", block: "start" }); } });
 
   // ---------- painel do estado ----------
+  // ---------- 2º turno ----------
+  // Códigos da eleição do 2º turno no TSE. Se o painel ficar "aguardando" depois das 17h,
+  // confira em /oficial/comum/config/ele-c.json e corrija por URL: ?t2pres=XXXX&t2gov=YYYY
+  const QS = new URLSearchParams(location.search);
+  const T2 = {
+    pres: { el: QS.get("t2pres") || "6258" },
+    gov:  { el: QS.get("t2gov") || "6260" },
+    govUFs: ["ac", "am", "df", "es", "rj", "rn", "to"],
+  };
+  let t2On = false;
+  const R2 = {}; // "pres:br" | "pres:mg" | "gov:rj" -> undefined (carregando) | null (não publicado) | Error | dados
+  const t2Url = (kind, uf) => {
+    const el = T2[kind].el, cargo = kind === "pres" ? "0001" : "0003";
+    return `${BASE}/${el}/dados/${uf}/${uf}-c${cargo}-e${el.padStart(6, "0")}-u.json`;
+  };
+  const t2Jobs = () => {
+    const jobs = [["pres", "br"], ["pres", selected]];
+    if (T2.govUFs.includes(selected)) jobs.push(["gov", selected]);
+    return jobs;
+  };
+  // Mesma rota das demais consultas (timeout, nova tentativa, pausa em 429); no ?demo usa dados fictícios
+  function loadT2() {
+    const jobs = t2Jobs().filter(([k, uf]) => !R2[k + ":" + uf]?.final);
+    return Promise.all(jobs.map(async ([k, uf]) => {
+      const key = k + ":" + uf, old = R2[key];
+      try { R2[key] = await fetchRaceRaw(k, uf, t2Url(k, uf)); }
+      catch (e) { R2[key] = old && !(old instanceof Error) ? old : e; }
+    })).then(() => { if (t2On) renderT2(); });
+  }
+  function t2Block(k, uf) {
+    const n = R2[k + ":" + uf];
+    if (n === undefined) return `<div class="empty"><strong>Carregando…</strong></div>`;
+    if (n instanceof Error) return waiting(n.message);
+    if (n === null) return waiting("") + `<div class="more">Arquivo consultado: <a href="${esc(t2Url(k, uf))}" target="_blank" rel="noopener">${esc(t2Url(k, uf).replace(BASE, ""))}</a></div>`;
+    return `<div style="display:flex;justify-content:flex-end"><span class="pill ${n.sit.cls}">${n.sit.cls === "done" ? OK_IC : ""}${n.sit.label}</span></div>`
+      + progress(n) + candList(k, uf, n, 2) + stats(n) + `<div class="more">Dados do TSE de ${esc(n.when)}</div>`; // fotos: pasta do 1º turno (mesmo sqcand)
+  }
+  function renderT2() {
+    const titles = { pres: "Presidente", gov: "Governador" };
+    let html = t2Jobs().map(([k, uf]) => {
+      const where = uf === "br" ? "Brasil" : UFNAME[uf];
+      return `<div class="detail"><div class="eyebrow">${titles[k]} · ${esc(where)} · 2º turno</div>${t2Block(k, uf)}</div>`;
+    }).join("");
+    if (!T2.govUFs.includes(selected))
+      html += `<div class="more">${esc(UFNAME[selected])} não tem 2º turno para governador.</div>`;
+    $("detail").innerHTML = html;
+  }
+
   const TABS = ["pres", "gov", "sen", "depfed", "depest"];
   function renderTabs() {
-    $("tabs").innerHTML = TABS.map(t => `<button type="button" role="tab" data-tab="${t}" aria-selected="${t === tab}">${titleOf(t, selected)}</button>`).join("");
+    $("tabs").innerHTML = [...TABS, "t2"].map(t => { const sel = t === "t2" ? t2On : (!t2On && t === tab); return `<button type="button" role="tab" data-tab="${t}" aria-selected="${sel}">${t === "t2" ? "2º turno" : titleOf(t, selected)}</button>`; }).join("");
   }
-  $("tabs").addEventListener("click", ev => { const b = ev.target.closest("[data-tab]"); if (b) { tab = b.dataset.tab; renderTabs(); buildDetail(); loadSelected(); } });
+  $("tabs").addEventListener("click", ev => { const b = ev.target.closest("[data-tab]"); if (!b) return; t2On = b.dataset.tab === "t2"; if (!t2On) tab = b.dataset.tab; renderTabs(); buildDetail(); if (!t2On) loadSelected(); });
 
   function buildDetail() {
+    if (t2On) { renderT2(); renderDetail(); loadT2(); return; }
     const K = KINDS[tab];
     $("detail").innerHTML = K.prop
       ? `<div id="pd-top"></div>
@@ -788,6 +837,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     const g = S[selected].gov;
     $("st-name").textContent = UFNAME[selected];
     const pill = $("st-pill");
+    if (t2On) { pill.className = "pill runoff"; pill.textContent = "2º turno"; return; }
     if (g && !(g instanceof Error)) { pill.className = "pill"; pill.textContent = fmtPct(g.pst) + " apurado"; }
     else { pill.className = "pill wait"; pill.textContent = "Aguardando"; }
 
@@ -1255,6 +1305,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     const fetchRace = (k, uf) => fetchRaceRaw(k, uf).then(n => my === gen ? n : new Promise(() => {}), e => my === gen ? Promise.reject(e) : new Promise(() => {}));
     tseLimited = false;
     if (DEMO) demoTick++;
+    if (t2On) loadT2();
     let errors = 0, got = 0, doneCount = 0;
     // Em caso de erro, mantém o último resultado bom em vez de apagar o estado da tela
     const keep = (old, e) => old && !(old instanceof Error) ? old : e;
