@@ -894,6 +894,13 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     return `<article class="t2-card"><h3>${esc(title)}</h3><div class="t2-sub">${k === "pres" ? "Disputa presidencial" : "Disputa estadual"}</div>${body}</article>`;
   }
   function renderSecondTurn() {
+    // Atualiza o cabeçalho primeiro, para que um erro em qualquer painel não esconda os horários.
+    const times = t2MapJobs().map(([k, id]) => R2[k + ":" + id])
+      .filter(n => n && !(n instanceof Error))
+      .map(n => parseTse(n.when)).filter(Boolean);
+    const latestT2 = times.length ? new Date(Math.max(...times)) : null;
+    const checkedT2 = t2LastFetchAt ? fmtHM(t2LastFetchAt) : "—";
+    $("t2-updated").textContent = `Última busca: ${checkedT2} · Último envio do TSE: ${latestT2 ? fmtHM(latestT2) : "—"}`;
     $("t2-national").innerHTML = t2Card("pres", "br");
     const pres = R2["pres:br"];
     const govResults = T2.govUFs.map(uf => R2["gov:" + uf]).filter(n => n && !(n instanceof Error));
@@ -920,13 +927,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     $("t2-gov-stats").innerHTML = gov && !(gov instanceof Error)
       ? `<div class="eyebrow" style="margin-bottom:12px">Estatísticas · ${esc(UFNAME[uf] || uf.toUpperCase())}</div>${stats(gov)}`
       : `<div class="eyebrow" style="margin-bottom:12px">Estatísticas</div>${waiting(gov instanceof Error ? gov.message : "")}`;
-    // Replica a lógica do primeiro turno: usa o horário mais recente entre Brasil e arquivos estaduais.
-    const times = t2MapJobs().map(([k, id]) => R2[k + ":" + id])
-      .filter(n => n && !(n instanceof Error))
-      .map(n => parseTse(n.when)).filter(Boolean);
-    const latestT2 = times.length ? new Date(Math.max(...times)) : null;
-    const checkedT2 = t2LastFetchAt ? fmtHM(t2LastFetchAt) : "—";
-    $("t2-updated").textContent = `Última busca: ${checkedT2} · Último envio do TSE: ${latestT2 ? fmtHM(latestT2) : "—"}`;
+    // Os horários do cabeçalho já foram atualizados no início desta função.
   }
   function setTurn(mode) {
     secondTurnMode = mode;
