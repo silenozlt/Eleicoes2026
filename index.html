@@ -354,7 +354,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   <section class="geo">
     <div class="panel map-wrap" id="map-wrap">
       <div class="map-tools">
-        <h2 class="sec">Brasil</h2>
+        <h2 class="sec" id="map-title">Brasil · 1º turno</h2>
         <div class="seg" role="group" aria-label="Cor do mapa">
           <button type="button" id="layer-pst" aria-pressed="false">Urnas apuradas</button>
           <button type="button" id="layer-pres" aria-pressed="true">Presidente</button>
@@ -835,6 +835,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   }
   function setTurn(mode) {
     secondTurnMode = mode;
+    $("map-title").textContent = mode ? "Brasil · 2º turno" : "Brasil · 1º turno";
     $("first-turn-top").hidden = mode;
     $("first-turn-content").hidden = mode;
     $("second-turn-view").hidden = !mode;
