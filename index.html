@@ -342,10 +342,13 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       <div class="panel" id="t2-national"></div>
       <div class="panel kpis" id="t2-kpis" aria-label="Indicadores de apuração do segundo turno"></div>
     </section>
-    <section class="panel" style="display:grid;gap:12px">
+    <section style="display:grid;gap:12px;min-width:0">
       <div class="sec-head"><h2 class="sec">Governadores</h2><label class="eyebrow" for="t2-uf-select">Estado</label></div>
       <select id="t2-uf-select" aria-label="Selecionar estado para governador no segundo turno"></select>
-      <div id="t2-governor"></div>
+      <section class="national" aria-label="Resultado e estatísticas do governador no segundo turno">
+        <div class="panel" id="t2-governor"></div>
+        <div class="panel" id="t2-gov-stats"></div>
+      </section>
     </section>
   </section>
   <div id="first-turn-top">
@@ -876,13 +879,13 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
     });
   }
 
-  function t2Card(k, uf) {
+  function t2Card(k, uf, includeStats = true) {
     const n = R2[k + ":" + uf];
     const title = k === "pres" ? "Presidente · Brasil" : `Governador · ${UFNAME[uf] || uf.toUpperCase()}`;
     let body = n === undefined ? `<div class="empty"><strong>Carregando dados do TSE…</strong></div>`
       : n instanceof Error ? waiting(n.message)
       : n === null ? waiting("") + `<div class="more">Dados do segundo turno ainda não publicados neste endereço.</div>`
-      : `<div class="eyebrow">${fmtPct(n.pst)} das urnas apuradas</div>${progress(n)}${candList(k, uf, n, 2)}${stats(n)}<div class="more">Dados do TSE de ${esc(n.when)}</div>`;
+      : `<div class="eyebrow">${fmtPct(n.pst)} das urnas apuradas</div>${progress(n)}${candList(k, uf, n, 2)}${includeStats ? stats(n) : ""}<div class="more">Dados do TSE de ${esc(n.when)}</div>`;
     return `<article class="t2-card"><h3>${esc(title)}</h3><div class="t2-sub">${k === "pres" ? "Disputa presidencial" : "Disputa estadual"}</div>${body}</article>`;
   }
   function renderSecondTurn() {
@@ -907,7 +910,11 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       sel.addEventListener("change", renderSecondTurn);
     }
     const uf = sel.value;
-    $("t2-governor").innerHTML = T2.govUFs.includes(uf) ? t2Card("gov", uf) : `<div class="empty">Não há disputa de governador cadastrada para esta UF.</div>`;
+    const gov = T2.govUFs.includes(uf) ? R2["gov:" + uf] : null;
+    $("t2-governor").innerHTML = T2.govUFs.includes(uf) ? t2Card("gov", uf, false) : `<div class="empty">Não há disputa de governador cadastrada para esta UF.</div>`;
+    $("t2-gov-stats").innerHTML = gov && !(gov instanceof Error)
+      ? `<div class="eyebrow" style="margin-bottom:12px">Estatísticas · ${esc(UFNAME[uf] || uf.toUpperCase())}</div>${stats(gov)}`
+      : `<div class="eyebrow" style="margin-bottom:12px">Estatísticas</div>${waiting(gov instanceof Error ? gov.message : "")}`;
     const times = t2Jobs().map(([k, id]) => R2[k + ":" + id]).filter(n => n && !(n instanceof Error)).map(n => parseTse(n.when)).filter(Boolean);
     $("t2-updated").textContent = times.length ? `Dados do TSE · ${fmtHM(new Date(Math.max(...times)))}` : "Aguardando dados oficiais do TSE";
   }
