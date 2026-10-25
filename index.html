@@ -846,6 +846,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   };
   let t2On = false;
   const R2 = {}; // "pres:br" | "pres:mg" | "gov:rj" -> undefined (carregando) | null (não publicado) | Error | dados
+  let t2LastFetchAt = null; // horário local da última consulta iniciada aos arquivos do 2º turno
   const t2Url = (kind, uf) => {
     const el = T2[kind].el, cargo = kind === "pres" ? "0001" : "0003";
     return `${BASE}/${el}/dados/${uf}/${uf}-c${cargo}-e${el.padStart(6, "0")}-u.json`;
@@ -869,6 +870,7 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
   }
   function loadT2() {
     const jobs = t2MapJobs().filter(([k, uf]) => !R2[k + ":" + uf]?.final && !t2Loaded.has(k + ":" + uf));
+    if (jobs.length) t2LastFetchAt = new Date();
     return Promise.all(jobs.map(async ([k, uf]) => {
       const key = k + ":" + uf; t2Loaded.add(key);
       try { R2[key] = await fetchT2Race(k, uf); }
@@ -923,13 +925,8 @@ svg.map .lead-dot { fill: var(--fg); stroke: none; }
       .filter(n => n && !(n instanceof Error))
       .map(n => parseTse(n.when)).filter(Boolean);
     const latestT2 = times.length ? new Date(Math.max(...times)) : null;
-    const checkedT2 = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
-    const staleT2 = latestT2 && Date.now() - latestT2.getTime() > 10 * 60 * 1000;
-    $("t2-updated").textContent = !latestT2
-      ? `Aguardando divulgação · checado às ${checkedT2}`
-      : staleT2
-        ? `TSE sem atualizar desde ${fmtHM(latestT2)} · checado às ${checkedT2}`
-        : `Dados do TSE de ${fmtHM(latestT2)} · checado às ${checkedT2}`;
+    const checkedT2 = t2LastFetchAt ? fmtHM(t2LastFetchAt) : "—";
+    $("t2-updated").textContent = `Última busca: ${checkedT2} · Último envio do TSE: ${latestT2 ? fmtHM(latestT2) : "—"}`;
   }
   function setTurn(mode) {
     secondTurnMode = mode;
